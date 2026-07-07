@@ -39,11 +39,12 @@ your eval output
 | `core/schema.py` | The canonical data model: `Example`, `EvalData`, `Finding`, `Status`. |
 | `core/ingest.py` | Read a file from disk; route JSON through auto-detection and CSV through the record reader. |
 | `core/pairing.py` | Pair two single-model files into one A-vs-B comparison. |
-| `adapters/` | Detect a format and map it into the canonical model. |
-| `stats/` | Pure statistical primitives. No knowledge of findings or formatting. |
+| `adapters/` | Detect a format (Promptfoo, DeepEval, nested JSON, records, CSV) and map it into the canonical model. |
+| `stats/` | Pure statistical primitives (resampling, effect size, power, McNemar, agreement). No knowledge of findings or formatting. |
 | `audit/` | The checks, the verdict rules, and the runner that orchestrates them. |
-| `report/terminal.py` | Render a report to the terminal with `rich`. |
-| `cli.py` | The `evaltrust audit` command. |
+| `report/terminal.py` | Render a report to the terminal (`rich`) or as plain ASCII. |
+| `api.py` | The public `evaltrust.audit(...)` entry point. |
+| `cli.py` | The `evaltrust audit` command (terminal, `--json`, `--plain`). |
 
 ## Design principles
 

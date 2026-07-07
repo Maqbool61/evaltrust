@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-07-07
+
 ### Added
 
 - **Python API**: `evaltrust.audit(source)` accepts a path, two paths, or an
@@ -17,6 +19,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   of forcing every non-significant result to look like a failure.
 - Proportion-appropriate statistics for pass/fail data: **McNemar's exact test**
   and **Cohen's h** / risk difference.
+- **DeepEval adapter**: reads DeepEval's test-results export directly.
+- Reports name the models that weren't compared when a file has more than two.
 
 ### Changed
 
@@ -27,6 +31,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   detectable effect**.
 - Verdict summaries reflect the actual outcome (equivalent / inconclusive), not a
   generic "improvement is probably real".
+- Documented the tool's assumptions and limitations, and made adapter-coverage
+  claims precise.
 
 ## [0.1.0] — 2026-07-07
 
@@ -51,5 +57,6 @@ Initial release.
 - `--strict` flag to fail CI on a Low-Confidence verdict.
 - Deterministic, seeded resampling so audits are reproducible.
 
-[Unreleased]: https://github.com/k-dickinson/evaltrust/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/k-dickinson/evaltrust/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/k-dickinson/evaltrust/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/k-dickinson/evaltrust/releases/tag/v0.1.0

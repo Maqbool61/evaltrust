@@ -161,7 +161,7 @@ score.
 
 | Pillar | The question it answers |
 |--------|-------------------------|
-| **Statistical Validity** | Is the gap real, large enough to matter, and was the sample big enough to detect it? Paired permutation test, bootstrap confidence interval, Cohen's *d*, and power analysis. |
+| **Statistical Validity** | Is the difference a real improvement, no real difference, or just too little data to tell? Significance (McNemar for pass/fail, paired permutation for continuous), equivalence testing, an interpretable effect size, and the minimum detectable effect. |
 | **Benchmark Health** | Can the benchmark even separate these models, or is it saturated / flat? |
 | **Repeatability** | If you reran the evaluation, would the winner stay the winner? Uses repeated-run data when the file contains it. |
 | **Judge Reliability** | Would a different judge reach the same verdict? Uses multi-judge data when the file contains it. |
@@ -203,9 +203,10 @@ resampling is seeded, so the auditor is itself reproducible. See
 
 ## Roadmap
 
-- **Now:** offline CLI, four pillars, terminal report.
-- **Next:** dedicated adapters for more tools, a Python API (`evaltrust.audit(...)`),
-  and an optional HTML report.
+- **Now:** offline CLI **and Python API**, four pillars, terminal / JSON / plain
+  output, equivalence testing, adapters for Promptfoo, DeepEval, JSON, and CSV.
+- **Next:** multi-metric eval suites (auditing several metrics at once with
+  multiple-comparison correction), more native adapters, and an optional HTML report.
 - **Later:** opt-in orchestration for the pillars that need to generate evidence
   (robustness perturbations, extra judges) and a provenance/reproducibility check.
 
