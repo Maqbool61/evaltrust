@@ -1,7 +1,11 @@
-"""EvalTrust — an auditor for LLM evaluations.
+"""EvalTrust — is your eval's result real, or just noise?
 
-Tells you whether you can trust an evaluation's conclusion, not just what the
-score is. Use the CLI (``evaltrust audit``) or this Python API:
+You ran an eval and got a score gap between two models. EvalTrust does the
+statistics that tell you whether that gap is a real improvement or a lucky streak,
+before you ship on it. It checks whether the difference is real, big enough to
+matter, and backed by enough data, and returns a High / Moderate / Low verdict.
+
+Use the CLI (``evaltrust audit``) or this Python API:
 
     import evaltrust
     report = evaltrust.audit("results.json")

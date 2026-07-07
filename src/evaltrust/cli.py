@@ -23,13 +23,17 @@ from .audit.verdict import VerdictLevel
 from .core.ingest import load, load_comparison
 from .report.terminal import print_report, render_plain
 
-app = typer.Typer(add_completion=False, help="Audit whether you can trust an LLM evaluation.")
+app = typer.Typer(
+    add_completion=False,
+    help="Check whether an eval's result is real or just noise.")
 _err = Console(stderr=False)  # keep errors on stdout so they're easy to capture
 
 
 @app.callback()
 def main() -> None:
-    """EvalTrust — an auditor for LLM evaluations."""
+    """EvalTrust: you ran an eval and got a score gap between two models. This
+    tells you whether that gap is a real improvement or just luck, before you
+    ship on it."""
 
 
 @app.command()

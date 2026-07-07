@@ -10,14 +10,16 @@ Model A: 84.7
 Model B: 86.2
 ```
 
-From which teams conclude: ship B. But that conclusion rests on assumptions the
-numbers don't show. The difference might not be statistically significant. The
-sample might be too small. A second judge might disagree. The benchmark might be
-saturated, so a gain near the ceiling means little. The improvement might vanish
-when the prompt wording changes.
+From which teams conclude: ship B. But you can't tell by looking whether that
+1.5-point gap is a real improvement or a lucky streak. Think of a coin: 6 heads
+out of 10 flips proves nothing, but 600 out of 1,000 does — and the two look
+identical on the surface. Score gaps are the same. The difference might be noise.
+The sample might be too small. A second judge might disagree. The benchmark might
+be saturated, so a gain near the ceiling means little.
 
 Most evaluation tools report *what* the score is. Very few tell you whether you
-should *believe* it.
+should *believe* it — so people ship models and publish benchmark numbers on
+differences that are really noise.
 
 ## The idea
 

@@ -1,5 +1,9 @@
 # EvalTrust documentation
 
+EvalTrust checks whether an eval's conclusion is real or just noise. You ran an
+eval and got "Model B beats Model A by 1.5 points" — EvalTrust does the statistics
+that tell you whether to believe it, before you ship on a gap that might be luck.
+
 - [**Design & philosophy**](design.md) — what EvalTrust is, the problem it solves,
   and the principles behind it.
 - [**Architecture**](architecture.md) — the pipeline, the modules, and how they

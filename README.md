@@ -22,21 +22,32 @@
 
 ---
 
-Teams spend real money evaluating models, then look at two numbers:
+## The problem, in ten seconds
 
-```
-Model A: 84.7
-Model B: 86.2   ->  ship B
-```
+You spent a week evaluating two models. One scored 84.7%, the other 86.2%. Ship
+the better one, right?
 
-That single comparison hides a dozen assumptions. Maybe the difference isn't
-statistically significant. Maybe the sample is too small. Maybe another judge
-disagrees, or the benchmark is already saturated. Most eval tools tell you *what*
-your score is. **EvalTrust tells you whether you should believe it.**
+Maybe. Or maybe that 1.5-point gap is pure luck and the two models are actually
+the same. **You can't tell by looking, and neither can anyone else.** People ship
+models, publish benchmark numbers, and kill good ideas every day based on gaps
+that are just noise.
 
-It works like a financial audit: bookkeeping answers "what are the numbers?"; an
-audit answers "can you trust them?" EvalTrust is the audit for evaluations. It runs
-*after* your existing eval tool — it doesn't replace it.
+EvalTrust does the math that tells you. Point it at your eval results and it says,
+in plain English, whether the difference is **real**, whether it's **big enough to
+matter**, and whether you had **enough data to know** — then gives you one verdict:
+**High, Moderate, or Low confidence.** You keep using whatever eval tool you
+already have. Think of it as a code reviewer for your eval's conclusion.
+
+## Why you can't just eyeball it
+
+Think about a coin. Flip it 10 times, get 6 heads. Rigged? No — that happens by
+luck constantly. Now flip it 1,000 times and get 600 heads. *That's* real. Six
+out of ten and six hundred out of a thousand look the same on the surface, but
+only one is signal.
+
+"84.7 vs 86.2" is the exact same trap. EvalTrust computes how likely that gap is
+to be a lucky streak. If it's likely luck, it tells you straight: don't ship on
+this yet.
 
 ## Example
 
@@ -45,26 +56,45 @@ $ evaltrust audit gpt4_run.json claude_run.json
 ```
 
 ```
-EvalTrust Audit
-Comparing claude-3 vs gpt-4  · 150 examples · source: deepeval+deepeval
-╭─ Verdict ────────────────────────────────────────────────────────────────────╮
-│ Low Confidence                                                               │
-│ The evidence does not support the conclusion. Do not ship on this result     │
-│ as-is — resolve the issues below first.                                      │
-╰──────────────────────────────────────────────────────────────────────────────╯
- ✗ Improvement is not statistically significant   Statistical Validity
- ⚠ 95% confidence interval overlaps zero          Statistical Validity
- ⚠ Effect size is negligible                      Statistical Validity
- ✓ Benchmark has headroom                         Benchmark Health
+EvalTrust  claude-3 vs gpt-4 · 150 examples · deepeval
 
-  ✗ Improvement is not statistically significant
-    Why it matters   A raw gap means nothing until you rule out chance.
-    How we detected  A paired permutation test over 150 examples gave p = 0.41.
-    How to fix       Do not claim a winner yet. Collect more examples first.
+● Low Confidence
+Not enough data to call a winner. Collect more before deciding.
+
+Statistical Validity
+  ✗ Improvement of claude-3 over gpt-4 is inconclusive
+  ! Effect size is negligible
+  ! Sample size may be too small
+Benchmark Health
+  ✓ Benchmark has headroom
+  ✓ Benchmark discriminates between examples
+
+What to do
+  • Don't call a winner yet. Collect more examples first.
+  • Collect ~90 more examples (~240 total) to catch a small effect.
 ```
 
 Two runs at 71% and 74% — a three-point "win" that is actually noise. EvalTrust
-catches it before it becomes a shipping decision.
+catches it before it becomes a shipping decision. (Add `--explain` for the exact
+p-values and reasoning behind each line.)
+
+## Why the numbers are real, not our opinion
+
+Fair question for a tool that judges trust. Three things keep it honest:
+
+- **It runs standard, decades-old statistics** — the same significance tests,
+  confidence intervals, and power analysis scientists already use. Nothing invented.
+- **The math is proven correct.** Every calculation is checked in the test suite
+  against the libraries researchers trust (`scipy`, `statsmodels`) and must produce
+  the same numbers. So it's not "trust us" — it's "our math matches the reference
+  everyone already trusts."
+- **It's reproducible.** Same input, same answer, every time. An opinion drifts; a
+  calculation doesn't.
+
+One honest limit: EvalTrust checks whether your *numbers* support your conclusion.
+If the eval measured the wrong thing to begin with, it catches some of that
+(saturated benchmarks, judges that disagree) but not all of it. It's the
+statistician auditing your results, not a replacement for a well-designed eval.
 
 ## Installation
 
