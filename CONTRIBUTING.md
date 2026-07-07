@@ -83,10 +83,29 @@ to generate the missing data rather than crashing when the data isn't there.
 - Make sure `pytest` is green.
 - Describe *what* changed and *why* in the PR description.
 
-## Releasing
+## Releasing (maintainers)
 
-Maintainers: see [`RELEASING.md`](RELEASING.md). Releases publish to PyPI
-automatically via GitHub Releases and PyPI Trusted Publishing.
+Publishing to PyPI is automated: creating a GitHub Release triggers the
+`publish.yml` workflow, which builds the package and uploads it via PyPI Trusted
+Publishing (no API tokens are stored). To cut a release:
+
+1. Bump the version in `pyproject.toml` (`[project] version`).
+2. Move the `Unreleased` notes in `CHANGELOG.md` under a new version heading.
+3. Commit, tag, and push:
+
+   ```bash
+   git commit -am "Release vX.Y.Z"
+   git tag vX.Y.Z
+   git push origin main --tags
+   ```
+
+4. On GitHub, draft a new Release for the `vX.Y.Z` tag and publish it.
+
+You can validate the build locally at any time without publishing:
+
+```bash
+python -m build && twine check dist/*
+```
 
 ## Reporting bugs and requesting features
 

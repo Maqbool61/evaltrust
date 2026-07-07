@@ -178,8 +178,7 @@ resampling is seeded, so the auditor is itself reproducible. See
 ## Contributing
 
 Contributions are welcome — new format adapters and additional checks especially.
-Start with [`CONTRIBUTING.md`](CONTRIBUTING.md), and see [`RELEASING.md`](RELEASING.md)
-if you maintain releases. All participants are expected to follow the
+Start with [`CONTRIBUTING.md`](CONTRIBUTING.md). All participants are expected to follow the
 [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues per the
 [security policy](SECURITY.md).
 
