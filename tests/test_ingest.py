@@ -1,0 +1,63 @@
+"""Tests for loading evaluation files from disk (JSON and CSV)."""
+
+import json
+
+import pytest
+
+from evallab.adapters.registry import UnknownFormatError
+from evallab.core.ingest import load
+
+
+def write(tmp_path, name, text):
+    p = tmp_path / name
+    p.write_text(text)
+    return str(p)
+
+
+def test_loads_native_json(tmp_path):
+    raw = {"models": ["A", "B"],
+           "examples": [{"id": "q1", "scores": {"A": 1, "B": 0}}]}
+    data = load(write(tmp_path, "r.json", json.dumps(raw)))
+    assert data.source_format == "native"
+    assert set(data.models) == {"A", "B"}
+
+
+def test_loads_promptfoo_json(tmp_path):
+    raw = {"results": {"results": [
+        {"provider": {"id": "gpt"}, "testIdx": 0, "score": 1},
+        {"provider": {"id": "claude"}, "testIdx": 0, "score": 0},
+    ]}}
+    data = load(write(tmp_path, "pf.json", json.dumps(raw)))
+    assert data.source_format == "promptfoo"
+
+
+def test_loads_generic_records_json(tmp_path):
+    raw = [{"id": "q1", "model": "A", "score": 1},
+           {"id": "q1", "model": "B", "score": 0}]
+    data = load(write(tmp_path, "g.json", json.dumps(raw)))
+    assert data.source_format == "generic"
+
+
+def test_loads_wide_csv(tmp_path):
+    csv_text = "question,gpt,claude\nq1,1,0\nq2,0,1\n"
+    data = load(write(tmp_path, "scores.csv", csv_text))
+    assert data.source_format == "csv"
+    assert set(data.models) == {"gpt", "claude"}
+    assert data.n_examples == 2
+
+
+def test_loads_long_csv(tmp_path):
+    csv_text = "id,model,score\nq1,A,1\nq1,B,0\nq2,A,0\nq2,B,1\n"
+    data = load(write(tmp_path, "long.csv", csv_text))
+    assert set(data.models) == {"A", "B"}
+    assert data.n_examples == 2
+
+
+def test_unknown_json_raises_helpful_error(tmp_path):
+    with pytest.raises(UnknownFormatError):
+        load(write(tmp_path, "x.json", json.dumps({"nope": 1})))
+
+
+def test_missing_file_raises(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        load(str(tmp_path / "does_not_exist.json"))
