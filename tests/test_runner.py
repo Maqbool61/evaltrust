@@ -51,6 +51,18 @@ def test_more_than_two_models_compares_the_two_strongest():
     assert {report.model_a, report.model_b} == {"best", "mid"}
 
 
+def test_report_records_all_available_models():
+    data = make_data({"weak": [0] * 30, "best": [1] * 30, "mid": [1] * 15 + [0] * 15}, 30)
+    report = run_audit(data)
+    assert set(report.models_available) == {"weak", "best", "mid"}
+    assert report.to_dict()["models_available"] == report.models_available
+
+
+def test_two_model_file_reports_both_as_available():
+    data = make_data({"A": [0] * 20, "B": [1] * 20}, 20)
+    assert set(run_audit(data).models_available) == {"A", "B"}
+
+
 def test_explicit_models_are_respected():
     data = make_data({"A": [0] * 30, "B": [1] * 30, "C": [1] * 30}, 30)
     report = run_audit(data, model_a="A", model_b="C")

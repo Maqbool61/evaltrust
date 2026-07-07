@@ -42,6 +42,13 @@ def _renderable(report: AuditReport):
         (f"Comparing {report.model_a} vs {report.model_b}  ", "cyan"),
         (f"· {report.n_examples} examples · source: {report.source_format}", "dim"),
     )
+    others = [m for m in report.models_available
+              if m not in (report.model_a, report.model_b)]
+    if others:
+        header.append(
+            f"\nCompared the two strongest of {len(report.models_available)} "
+            f"models; also present: {', '.join(others)} "
+            "(use --model-a/--model-b to pick a different pair)", "dim")
 
     verdict_panel = Panel(
         Text.assemble((f"{verdict.level.value}\n", style), (verdict.summary, "")),
@@ -108,10 +115,18 @@ def render_plain(report: AuditReport) -> str:
     viewers, non-UTF-8 locales, and piping to a file.
     """
     v = report.verdict
+    others = [m for m in report.models_available
+              if m not in (report.model_a, report.model_b)]
     lines = [
         "EvalTrust Audit",
         f"{report.model_a} vs {report.model_b}  "
         f"({report.n_examples} examples, source: {report.source_format})",
+    ]
+    if others:
+        lines.append(
+            f"Compared the two strongest of {len(report.models_available)} models; "
+            f"also present: {', '.join(others)}.")
+    lines += [
         "",
         f"VERDICT: {v.level.value.upper()}",
         v.summary,

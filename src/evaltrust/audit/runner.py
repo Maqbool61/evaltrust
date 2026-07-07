@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -22,6 +22,7 @@ class AuditReport:
     source_format: str
     findings: list[Finding]
     verdict: Verdict
+    models_available: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """A JSON-serializable representation of the whole audit."""
@@ -29,6 +30,7 @@ class AuditReport:
             "models": [self.model_a, self.model_b],
             "model_a": self.model_a,
             "model_b": self.model_b,
+            "models_available": self.models_available,
             "n_examples": self.n_examples,
             "source_format": self.source_format,
             "verdict": self.verdict.to_dict(),
@@ -75,4 +77,5 @@ def run_audit(
         source_format=data.source_format,
         findings=findings,
         verdict=compute_verdict(findings),
+        models_available=list(data.models),
     )
