@@ -28,8 +28,8 @@ METRIC_KEYS = ("metric", "metric_name", "criterion", "dimension", "check_name",
 
 DEFAULT_METRIC = "score"
 
-_TRUE = {"pass", "passed", "true", "yes", "correct", "success", "y", "t", "1"}
-_FALSE = {"fail", "failed", "false", "no", "incorrect", "failure", "n", "f", "0"}
+_TRUE = {"pass", "passed", "true", "yes", "correct", "success", "y", "t", "1", "win"}
+_FALSE = {"fail", "failed", "false", "no", "incorrect", "failure", "n", "f", "0", "loss"}
 
 
 @dataclass(frozen=True)

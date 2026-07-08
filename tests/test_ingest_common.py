@@ -21,6 +21,7 @@ from evaltrust.adapters.common import Record, coerce_score, records_to_evaldata
     ("pass", 1.0), ("PASS", 1.0), ("fail", 0.0), ("Fail", 0.0),
     ("true", 1.0), ("false", 0.0), ("yes", 1.0), ("no", 0.0),
     ("correct", 1.0), ("incorrect", 0.0),
+    ("win", 1.0), ("loss", 0.0),
 ])
 def test_coerce_score_normalises_common_spellings(raw, expected):
     assert coerce_score(raw) == pytest.approx(expected)
