@@ -200,6 +200,11 @@ Every finding follows the same rule — **why it matters**, **how we detected it
 and **how to fix it**. Checks that need extra data (repeated runs, multiple
 judges) don't guess when it's missing; they tell you how to generate it.
 
+Scoring several metrics per example (correctness, safety, tone…)? Add a `metric`
+column and EvalTrust audits each one, corrects the significance threshold for the
+number of metrics (so you don't get false wins by testing many), and reports the
+suite's confidence as its weakest metric.
+
 See [`docs/checks.md`](docs/checks.md) for the methods and thresholds behind each
 one.
 
@@ -234,9 +239,10 @@ resampling is seeded, so the auditor is itself reproducible. See
 ## Roadmap
 
 - **Now:** offline CLI **and Python API**, four pillars, terminal / JSON / plain
-  output, equivalence testing, adapters for Promptfoo, DeepEval, JSON, and CSV.
-- **Next:** multi-metric eval suites (auditing several metrics at once with
-  multiple-comparison correction), more native adapters, and an optional HTML report.
+  output, equivalence testing, **multi-metric suites** (with multiple-comparison
+  correction), adapters for Promptfoo, DeepEval, JSON, and CSV.
+- **Next:** native adapters for hosted platforms (LangSmith, Braintrust, ...), an
+  optional HTML report, and historical/regression tracking across runs.
 - **Later:** opt-in orchestration for the pillars that need to generate evidence
   (robustness perturbations, extra judges) and a provenance/reproducibility check.
 

@@ -6,6 +6,15 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Multi-metric suites.** A file with a `metric` column is audited one metric at
+  a time (same model pair throughout), with the significance threshold
+  **Bonferroni-corrected** for the number of metrics so testing many metrics
+  doesn't manufacture false wins. The suite's confidence is its weakest metric.
+- `evaltrust.audit_suite(...)` Python API and `SuiteReport` (with `to_dict()`);
+  the CLI auto-detects multi-metric files and renders a per-metric summary.
+
 ## [0.3.0] — 2026-07-07
 
 ### Added

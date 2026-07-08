@@ -23,6 +23,10 @@ MODEL_KEYS = ("model", "provider", "system", "variant", "candidate", "engine",
 SCORE_KEYS = ("score", "pass", "passed", "success", "correct", "result",
               "value", "metric_score", "rating", "grade", "reward")
 JUDGE_KEYS = ("judge", "evaluator", "grader", "rater", "judge_model")
+METRIC_KEYS = ("metric", "metric_name", "criterion", "dimension", "check_name",
+               "aspect")
+
+DEFAULT_METRIC = "score"
 
 _TRUE = {"pass", "passed", "true", "yes", "correct", "success", "y", "t", "1"}
 _FALSE = {"fail", "failed", "false", "no", "incorrect", "failure", "n", "f", "0"}
@@ -30,12 +34,17 @@ _FALSE = {"fail", "failed", "false", "no", "incorrect", "failure", "n", "f", "0"
 
 @dataclass(frozen=True)
 class Record:
-    """One (example, model, score) observation, optionally by a named judge."""
+    """One (example, model, score) observation for a named metric.
+
+    ``metric`` lets a single file carry several metrics per example (correctness,
+    safety, ...). When there is only one metric it defaults to ``"score"``.
+    """
 
     example_id: str
     model: str
     score: float
     judge: str | None = None
+    metric: str = DEFAULT_METRIC
 
 
 def coerce_score(raw) -> float:
@@ -120,4 +129,26 @@ def records_to_evaldata(
         examples=examples,
         source_format=source_format,
         metadata=metadata or {},
+    )
+
+
+def records_to_suite(
+    records: list[Record], source_format: str, metadata: dict | None = None
+) -> "OrderedDict[str, EvalData]":
+    """Split records by metric into one canonical dataset per metric.
+
+    A file with a single metric yields a one-entry suite keyed ``"score"``, so the
+    same code path handles single- and multi-metric inputs. Metric order follows
+    first appearance.
+    """
+    if not records:
+        raise ValueError("No records found to build an evaluation from")
+
+    by_metric: "OrderedDict[str, list[Record]]" = OrderedDict()
+    for rec in records:
+        by_metric.setdefault(rec.metric, []).append(rec)
+
+    return OrderedDict(
+        (metric, records_to_evaldata(recs, source_format, metadata))
+        for metric, recs in by_metric.items()
     )

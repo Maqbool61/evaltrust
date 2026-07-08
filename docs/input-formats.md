@@ -93,6 +93,24 @@ q2,0,1
 Scores can be numbers, booleans, or words like `pass`/`fail`, `true`/`false`,
 `yes`/`no`, `correct`/`incorrect`.
 
+## Multiple metrics
+
+If your eval scores several metrics per example (correctness, safety, tone...),
+add a `metric` column to the long format. EvalTrust audits each metric separately
+and corrects for the number of metrics tested:
+
+```csv
+id,model,metric,score
+q1,gpt-4,correctness,1
+q1,claude-3,correctness,0
+q1,gpt-4,safety,1
+q1,claude-3,safety,1
+```
+
+The same works in JSON record lists (`{"id","model","metric","score"}`). A file
+without a `metric` column is treated as a single metric, exactly as before. See
+[checks](checks.md#multiple-metrics-suites) for how the metrics are combined.
+
 ## Single-model tools (two-file comparison)
 
 Some tools — DeepEval, LangSmith, OpenEvals — evaluate one model per run, so a

@@ -12,15 +12,18 @@ Use the CLI (``evaltrust audit``) or this Python API:
     print(report.verdict.level)
 """
 
-from .api import audit
+from .api import audit, audit_suite
 from .audit.runner import AuditReport, run_audit
+from .audit.suite import SuiteReport
 from .audit.verdict import Verdict, VerdictLevel
 from .core.schema import EvalData, Example, Finding, Status
 
 __all__ = [
     "audit",
+    "audit_suite",
     "run_audit",
     "AuditReport",
+    "SuiteReport",
     "Verdict",
     "VerdictLevel",
     "EvalData",

@@ -12,10 +12,16 @@ import io
 import json
 from pathlib import Path
 
+from collections import OrderedDict
+
 from .pairing import merge_two, primary_model
 from .schema import EvalData
-from ..adapters.common import records_to_evaldata
-from ..adapters.generic import dicts_to_records
+from ..adapters.common import (
+    DEFAULT_METRIC,
+    records_to_evaldata,
+    records_to_suite,
+)
+from ..adapters.generic import _find_record_list, dicts_to_records
 from ..adapters.registry import UnknownFormatError, detect_adapter
 
 
@@ -60,6 +66,41 @@ def load(path: str) -> EvalData:
         return _load_json(text)
     except (json.JSONDecodeError, UnknownFormatError):
         return _load_csv(text)
+
+
+def load_suite(path: str) -> "OrderedDict[str, EvalData]":
+    """Load a file as a metric -> dataset map.
+
+    A file with a ``metric`` column (long records or CSV) becomes a multi-entry
+    suite; everything else becomes a single entry keyed ``"score"``. Callers audit
+    a single dataset when there's one metric, or the whole suite when there are
+    several.
+    """
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"No such evaluation file: {path}")
+    text = p.read_text()
+    suffix = p.suffix.lower()
+
+    if suffix == ".csv":
+        rows = list(csv.DictReader(io.StringIO(text)))
+        if not rows:
+            raise UnknownFormatError("The CSV file has no data rows.")
+        return records_to_suite(dicts_to_records(rows), "csv")
+
+    # JSON (or fallback): only the generic record list can carry a metric column.
+    try:
+        raw = json.loads(text)
+        adapter = detect_adapter(raw)
+        if adapter.source_format == "generic":
+            rows = _find_record_list(raw)
+            return records_to_suite(dicts_to_records(rows), "generic")
+        return OrderedDict([(DEFAULT_METRIC, adapter.parse(raw))])
+    except (json.JSONDecodeError, UnknownFormatError):
+        if suffix == ".json":
+            raise
+        rows = list(csv.DictReader(io.StringIO(text)))
+        return records_to_suite(dicts_to_records(rows), "csv")
 
 
 def load_comparison(

@@ -6,8 +6,9 @@ experiment trackers, not just read a terminal box. This is that surface.
 
 import json
 
-from evaltrust import audit
+from evaltrust import audit, audit_suite
 from evaltrust.audit.runner import AuditReport
+from evaltrust.audit.suite import SuiteReport
 from evaltrust.core.schema import EvalData, Example, Finding, Status
 
 
@@ -70,3 +71,26 @@ def test_verdict_to_dict_lists_driver_titles():
     assert d["verdict"]["level"] == "LOW"
     assert isinstance(d["verdict"]["drivers"], list)
     assert all(isinstance(x, str) for x in d["verdict"]["drivers"])
+
+
+def test_audit_suite_from_a_mapping():
+    suite = {
+        "correctness": make_data({"A": [0] * 200, "B": [1] * 180 + [0] * 20}, 200),
+        "tone": make_data({"A": [0, 1] * 60, "B": [1, 0] * 60}, 120),
+    }
+    report = audit_suite(suite)
+    assert isinstance(report, SuiteReport)
+    assert set(report.reports.keys()) == {"correctness", "tone"}
+
+
+def test_audit_suite_from_a_file(tmp_path):
+    p = tmp_path / "s.json"
+    rows = []
+    for i in range(60):
+        rows += [{"id": str(i), "model": "A", "metric": "m1", "score": 0},
+                 {"id": str(i), "model": "B", "metric": "m1", "score": 1},
+                 {"id": str(i), "model": "A", "metric": "m2", "score": 1},
+                 {"id": str(i), "model": "B", "metric": "m2", "score": 1}]
+    p.write_text(json.dumps(rows))
+    report = audit_suite(str(p))
+    assert set(report.reports.keys()) == {"m1", "m2"}

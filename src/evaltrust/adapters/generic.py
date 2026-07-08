@@ -10,8 +10,10 @@ from __future__ import annotations
 
 from ..core.schema import EvalData, Example
 from .common import (
+    DEFAULT_METRIC,
     ID_KEYS,
     JUDGE_KEYS,
+    METRIC_KEYS,
     MODEL_KEYS,
     Record,
     SCORE_KEYS,
@@ -58,17 +60,20 @@ def dicts_to_records(rows: list[dict]) -> list[Record]:
     model_key = _first_alias(keys, MODEL_KEYS)
     judge_key = _first_alias(keys, JUDGE_KEYS)
     score_key = _first_alias(keys, SCORE_KEYS)
+    metric_key = _first_alias(keys, METRIC_KEYS)
 
     records: list[Record] = []
     for idx, row in enumerate(rows):
         ex_id = str(row[id_key]) if id_key and row.get(id_key) is not None else str(idx)
         judge = str(row[judge_key]) if judge_key and row.get(judge_key) is not None else None
+        metric = (str(row[metric_key]) if metric_key and row.get(metric_key) is not None
+                  else DEFAULT_METRIC)
 
         if model_key and score_key:
             records.append(Record(ex_id, str(row[model_key]),
-                                  coerce_score(row[score_key]), judge))
+                                  coerce_score(row[score_key]), judge, metric))
         else:
-            reserved = {k for k in (id_key, judge_key) if k}
+            reserved = {k for k in (id_key, judge_key, metric_key) if k}
             for col, val in row.items():
                 if col in reserved:
                     continue
@@ -76,7 +81,7 @@ def dicts_to_records(rows: list[dict]) -> list[Record]:
                     score = coerce_score(val)
                 except ValueError:
                     continue
-                records.append(Record(ex_id, str(col), score, judge))
+                records.append(Record(ex_id, str(col), score, judge, metric))
 
     if not records:
         raise ValueError("No (example, model, score) records could be extracted")

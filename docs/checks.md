@@ -117,6 +117,19 @@ categorical, and the identity of the judge that agrees least with the rest.
 - **PASS** when mean agreement is at least 80%.
 - **WARN** otherwise, naming the likely outlier judge.
 
+## Multiple metrics (suites)
+
+If your file scores several metrics per example (a `metric` column, see
+[input formats](input-formats.md)), EvalTrust audits each metric separately with
+everything above, comparing the same two models throughout, and rolls the results
+into one suite report.
+
+Testing many metrics at once inflates false positives — run 20 metrics at
+`alpha = 0.05` and one will look "significant" by luck. EvalTrust corrects for this
+with **Bonferroni**: it divides the significance threshold by the number of
+metrics, so a metric is only called a real improvement if it clears the stricter
+bar. The suite's overall confidence is the **weakest** of its metrics.
+
 ## The verdict
 
 The overall verdict follows simple, documented rules rather than a weighted score:
@@ -135,12 +148,12 @@ current release assumes:
 
 - **Paired data.** Both models are scored on the *same* examples, matched by id.
   Unpaired comparisons (different test sets) are out of scope.
-- **One scalar score per example per model.** Multi-metric suites (several
-  metrics per example) and pairwise-preference judgments (A-beats-B votes) are not
-  yet modelled — audit each metric's scores separately for now.
-- **A two-model comparison.** When a file has more than two models, the two
-  strongest by mean are compared; there is no all-pairs sweep yet, and therefore
-  no multiple-comparison correction across pairs.
+- **Two models per comparison.** A comparison is between two models. Multi-metric
+  suites *are* supported (a `metric` column audits each metric and Bonferroni-
+  corrects for the number of metrics), but when a file has more than two *models*,
+  the two strongest by mean are compared rather than every pair.
+- **Scalar scores.** Each score is a number. Pairwise-preference judgments
+  (A-beats-B votes) are not yet modelled.
 - **Opinionated thresholds.** `alpha` and the equivalence margin are configurable;
   the effect-size, saturation, spread, and agreement cutoffs use conventional
   defaults that may not fit every domain.

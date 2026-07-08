@@ -126,6 +126,91 @@ _ASCII = str.maketrans({
 })
 
 
+# --------------------------------------------------------------------------- #
+# Multi-metric suite rendering
+# --------------------------------------------------------------------------- #
+
+_OUTCOME = {
+    "significant": ("real improvement", "green"),
+    "equivalent": ("no difference", "yellow"),
+    "inconclusive": ("inconclusive", "red"),
+}
+
+
+def _metric_outcome(report: AuditReport) -> str:
+    for f in report.findings:
+        if f.details.get("check") == "decision":
+            return f.details.get("outcome", "")
+    return ""
+
+
+def _suite_header(suite):
+    first = next(iter(suite.reports.values()))
+    return (first.model_a, first.model_b, first.n_examples, len(suite.reports))
+
+
+def _suite_renderable(suite, explain: bool = False) -> Text:
+    a, b, n, k = _suite_header(suite)
+    t = Text()
+    t.append("EvalTrust  ", style="bold")
+    t.append(f"{a} vs {b} · {n} examples · {k} metrics\n", style="dim")
+    if suite.corrected_alpha != suite.alpha:
+        t.append(f"significance corrected for {k} metrics "
+                 f"({suite.correction})\n", style="dim")
+
+    lvl = suite.overall_level
+    t.append("\n● ", style=_DOT[lvl])
+    t.append(f"{lvl.value}", style=f"bold {_DOT[lvl]}")
+    t.append(f"  (weakest of {k} metrics)\n\n", style="dim")
+
+    width = max(len(m) for m in suite.reports)
+    for metric, report in suite.reports.items():
+        outcome = _metric_outcome(report)
+        label, color = _OUTCOME.get(outcome, (outcome, ""))
+        t.append(f"  {metric.ljust(width)}  ")
+        t.append(f"{report.verdict.level.value.split()[0].ljust(9)}", style=_DOT[report.verdict.level])
+        t.append(label + "\n", style=color)
+
+    if explain:
+        for metric, report in suite.reports.items():
+            t.append(f"\n{'─' * 3} {metric} {'─' * 3}\n", style="bold")
+            t.append(_renderable(report, explain=True))
+    else:
+        t.append("\nRun a single metric, or add --explain, for the full breakdown.\n",
+                 style="dim")
+    return t
+
+
+def render_suite(suite, explain: bool = False, width: int = 90) -> str:
+    console = Console(record=True, width=width, file=io.StringIO())
+    console.print(_suite_renderable(suite, explain=explain))
+    return console.export_text()
+
+
+def print_suite(suite, explain: bool = False) -> None:
+    Console().print(_suite_renderable(suite, explain=explain))
+
+
+def render_suite_plain(suite, explain: bool = False) -> str:
+    a, b, n, k = _suite_header(suite)
+    lines = [f"EvalTrust  {a} vs {b} - {n} examples - {k} metrics"]
+    if suite.corrected_alpha != suite.alpha:
+        lines.append(f"significance corrected for {k} metrics ({suite.correction})")
+    lines += ["", f"{suite.overall_level.value.upper()} (weakest of {k} metrics)", ""]
+
+    width = max(len(m) for m in suite.reports)
+    for metric, report in suite.reports.items():
+        outcome = _OUTCOME.get(_metric_outcome(report), (_metric_outcome(report), ""))[0]
+        level = report.verdict.level.value.split()[0]
+        lines.append(f"  {metric.ljust(width)}  {level.ljust(9)} {outcome}")
+
+    if explain:
+        for metric, report in suite.reports.items():
+            lines += ["", f"=== {metric} ===", render_plain(report, explain=True).rstrip()]
+
+    return ("\n".join(lines).rstrip() + "\n").translate(_ASCII)
+
+
 def render_plain(report: AuditReport, explain: bool = False) -> str:
     """Render the report as plain ASCII — safe for Windows, CI logs, and pipes."""
     v = report.verdict

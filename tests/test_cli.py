@@ -127,6 +127,34 @@ def test_plain_output_is_ascii_only(tmp_path):
     assert "╭" not in result.stdout
 
 
+def multi_metric_file(tmp_path):
+    lines = ["id,model,metric,score"]
+    for i in range(80):
+        # correctness: new clearly better; tone: identical noise
+        lines.append(f"q{i},old,correctness,{1 if i % 5 else 0}")
+        lines.append(f"q{i},new,correctness,{1 if i % 10 else 0}")
+        lines.append(f"q{i},old,tone,{i % 2}")
+        lines.append(f"q{i},new,tone,{(i + 1) % 2}")
+    p = tmp_path / "suite.csv"
+    p.write_text("\n".join(lines) + "\n")
+    return str(p)
+
+
+def test_multi_metric_file_produces_a_suite_report(tmp_path):
+    result = runner.invoke(app, ["audit", multi_metric_file(tmp_path)])
+    assert result.exit_code == 0
+    assert "metrics" in result.stdout
+    assert "correctness" in result.stdout and "tone" in result.stdout
+
+
+def test_multi_metric_json_has_per_metric_results(tmp_path):
+    import json as _json
+    result = runner.invoke(app, ["audit", multi_metric_file(tmp_path), "--json"])
+    payload = _json.loads(result.stdout)
+    assert set(payload["metrics"].keys()) == {"correctness", "tone"}
+    assert "corrected_alpha" in payload
+
+
 def test_explain_flag_adds_detail(tmp_path):
     base = runner.invoke(app, ["audit", noise_file(tmp_path)])
     detailed = runner.invoke(app, ["audit", noise_file(tmp_path), "--explain"])

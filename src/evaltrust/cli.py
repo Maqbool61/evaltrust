@@ -19,9 +19,15 @@ from rich.console import Console
 
 from .adapters.registry import UnknownFormatError
 from .audit.runner import run_audit
+from .audit.suite import audit_suite
 from .audit.verdict import VerdictLevel
-from .core.ingest import load, load_comparison
-from .report.terminal import print_report, render_plain
+from .core.ingest import load_comparison, load_suite
+from .report.terminal import (
+    print_report,
+    print_suite,
+    render_plain,
+    render_suite_plain,
+)
 
 app = typer.Typer(
     add_completion=False,
@@ -67,16 +73,24 @@ def audit(
         _err.print("[red]Provide at most two files (one, or two to compare).[/red]")
         raise typer.Exit(code=2)
 
+    suite_report = None
+    report = None
     try:
         if len(results) == 2:
             data = load_comparison(results, label_a=model_a, label_b=model_b)
             report = run_audit(data, alpha=alpha,
                                equivalence_margin=equivalence_margin, seed=seed)
         else:
-            data = load(results[0])
-            report = run_audit(data, model_a=model_a, model_b=model_b,
-                               alpha=alpha, equivalence_margin=equivalence_margin,
-                               seed=seed)
+            suite = load_suite(results[0])
+            if len(suite) > 1:
+                suite_report = audit_suite(
+                    suite, model_a=model_a, model_b=model_b, alpha=alpha,
+                    equivalence_margin=equivalence_margin, seed=seed)
+            else:
+                data = next(iter(suite.values()))
+                report = run_audit(data, model_a=model_a, model_b=model_b,
+                                   alpha=alpha, equivalence_margin=equivalence_margin,
+                                   seed=seed)
     except FileNotFoundError as e:
         _err.print(f"[red]{e}[/red]")
         raise typer.Exit(code=2)
@@ -87,14 +101,24 @@ def audit(
         _err.print(f"[red]{e}[/red]")
         raise typer.Exit(code=2)
 
-    if as_json:
-        typer.echo(json.dumps(report.to_dict(), indent=2))
-    elif plain:
-        typer.echo(render_plain(report, explain=explain), nl=False)
+    if suite_report is not None:
+        if as_json:
+            typer.echo(json.dumps(suite_report.to_dict(), indent=2))
+        elif plain:
+            typer.echo(render_suite_plain(suite_report, explain=explain), nl=False)
+        else:
+            print_suite(suite_report, explain=explain)
+        level = suite_report.overall_level
     else:
-        print_report(report, explain=explain)
+        if as_json:
+            typer.echo(json.dumps(report.to_dict(), indent=2))
+        elif plain:
+            typer.echo(render_plain(report, explain=explain), nl=False)
+        else:
+            print_report(report, explain=explain)
+        level = report.verdict.level
 
-    if strict and report.verdict.level is VerdictLevel.LOW:
+    if strict and level is VerdictLevel.LOW:
         raise typer.Exit(code=1)
 
 

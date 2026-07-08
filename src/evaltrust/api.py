@@ -15,7 +15,8 @@ single-model files, or an already-loaded ``EvalData``.
 from __future__ import annotations
 
 from .audit.runner import AuditReport, run_audit
-from .core.ingest import load, load_comparison
+from .audit.suite import SuiteReport, audit_suite as _audit_suite
+from .core.ingest import load, load_comparison, load_suite
 from .core.schema import EvalData
 
 
@@ -53,3 +54,24 @@ def audit(
 
     data = load(source)
     return run_audit(data, model_a=model_a, model_b=model_b, **kw)
+
+
+def audit_suite(
+    source: "str | dict[str, EvalData]",
+    *,
+    model_a: str | None = None,
+    model_b: str | None = None,
+    alpha: float = 0.05,
+    equivalence_margin: float = 0.05,
+    seed: int = 0,
+) -> SuiteReport:
+    """Audit a multi-metric suite and return a :class:`SuiteReport`.
+
+    ``source`` is a path to a file with a ``metric`` column, or a ready-made
+    ``{metric: EvalData}`` mapping. Every metric is audited for the same model
+    pair, with the significance threshold Bonferroni-corrected for the number of
+    metrics.
+    """
+    suite = load_suite(source) if isinstance(source, str) else source
+    return _audit_suite(suite, model_a=model_a, model_b=model_b, alpha=alpha,
+                        equivalence_margin=equivalence_margin, seed=seed)
