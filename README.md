@@ -284,9 +284,9 @@ resampling is seeded, so the auditor is itself reproducible. See
 
 ## Roadmap
 
-- **Now:** CLI **and Python API**; two-model, single-model, and multi-metric
-  audits; judge reliability + calibration; regression `diff`; config files; a CI
-  gate and GitHub Action; adapters for Promptfoo, DeepEval, JSON, and CSV.
+Where it's headed (individual tasks are tracked in
+[issues](https://github.com/k-dickinson/evaltrust/issues)):
+
 - **Next:** native adapters for hosted platforms (LangSmith, Braintrust, …), an
   optional HTML report, and richer history/trend tracking.
 - **Later:** opt-in orchestration for the pillars that need to *generate* evidence
