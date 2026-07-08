@@ -6,6 +6,8 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-07-08
+
 ### Added
 
 - **Multi-metric suites.** A file with a `metric` column is audited one metric at
@@ -98,7 +100,8 @@ Initial release.
 - `--strict` flag to fail CI on a Low-Confidence verdict.
 - Deterministic, seeded resampling so audits are reproducible.
 
-[Unreleased]: https://github.com/k-dickinson/evaltrust/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/k-dickinson/evaltrust/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/k-dickinson/evaltrust/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/k-dickinson/evaltrust/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/k-dickinson/evaltrust/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/k-dickinson/evaltrust/releases/tag/v0.1.0
