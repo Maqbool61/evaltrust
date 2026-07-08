@@ -23,6 +23,7 @@ class AuditConfig:
     equivalence_margin: float = 0.05        # largest negligible score gap
     power_target: float = 0.8               # target power for sample-size advice
     smallest_meaningful_effect: float = 0.2  # Cohen's d worth powering for
+    precision_margin: float = 0.05          # target CI half-width for a single score
     saturation_fraction: float = 0.95       # mean/ceiling that counts as saturated
     min_spread: float = 0.01                # pooled std below which no discrimination
     judge_agreement_threshold: float = 0.8  # inter-judge agreement to pass

@@ -6,6 +6,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Single-model auditing.** Point EvalTrust at one model's scores (no comparison)
+  and it reports whether you can trust the number: a confidence interval on the
+  score (precision), and — with `--threshold` — whether the model really clears a
+  target. A single-model file now audits instead of erroring.
+
 ## [0.4.0] — 2026-07-08
 
 ### Added

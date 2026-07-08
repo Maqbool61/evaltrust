@@ -38,11 +38,13 @@ def _grouped(findings) -> "OrderedDict[str, list[Finding]]":
 
 
 def _subtitle(report: AuditReport) -> str:
-    return (f"{report.model_a} vs {report.model_b} · "
-            f"{report.n_examples} examples · {report.source_format}")
+    who = report.model_a if report.is_single else f"{report.model_a} vs {report.model_b}"
+    return f"{who} · {report.n_examples} examples · {report.source_format}"
 
 
 def _others(report: AuditReport) -> list[str]:
+    if report.is_single:
+        return []
     return [m for m in report.models_available
             if m not in (report.model_a, report.model_b)]
 

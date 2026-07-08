@@ -128,6 +128,23 @@ with `--reference-judge`.
 - **PASS** when every AI judge agrees with the reference above the threshold.
 - **WARN** otherwise, naming the worst-calibrated judge and its agreement rate.
 
+## Single model (Score Reliability)
+
+If your file has only one model — you evaluated one system, not a comparison —
+EvalTrust switches from "is B better than A?" to "can I trust this score?":
+
+- **Precision.** A bootstrap confidence interval on the mean turns "84%" into
+  "84%, 95% CI [80%, 88%]". A wide interval means too few examples to trust the
+  number. **PASS** when the interval's half-width is within the target margin
+  (`precision_margin`, default 5 points); **WARN** otherwise, with how many more
+  examples would tighten it.
+- **Threshold** (optional). Pass `--threshold 0.8` and EvalTrust tests whether the
+  model really clears the bar: **PASS** if the interval is entirely above it,
+  **FAIL** if entirely below, **WARN** if it straddles (too close to call).
+
+Benchmark Health still runs. A threshold also forces single-model mode even when
+the file has two models (`evaltrust audit results.json --threshold 0.8`).
+
 ## Multiple metrics (suites)
 
 If your file scores several metrics per example (a `metric` column, see
@@ -159,10 +176,10 @@ current release assumes:
 
 - **Paired data.** Both models are scored on the *same* examples, matched by id.
   Unpaired comparisons (different test sets) are out of scope.
-- **Two models per comparison.** A comparison is between two models. Multi-metric
-  suites *are* supported (a `metric` column audits each metric and Bonferroni-
-  corrects for the number of metrics), but when a file has more than two *models*,
-  the two strongest by mean are compared rather than every pair.
+- **Two models per comparison.** A comparison is between two models. A single
+  model is supported too (Score Reliability, above). Multi-metric suites *are*
+  supported (a `metric` column, Bonferroni-corrected), but when a file has more
+  than two *models*, the two strongest by mean are compared rather than every pair.
 - **Scalar scores.** Each score is a number. Pairwise-preference judgments
   (A-beats-B votes) are not yet modelled.
 - **Opinionated thresholds.** `alpha` and the equivalence margin are configurable;

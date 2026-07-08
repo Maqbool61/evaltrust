@@ -218,6 +218,11 @@ column and EvalTrust audits each one, corrects the significance threshold for th
 number of metrics (so you don't get false wins by testing many), and reports the
 suite's confidence as its weakest metric.
 
+**Only evaluated one model?** Point it at a single model's scores and EvalTrust
+switches to asking *can I trust this number?* — it puts a confidence interval
+around your score (is 84% really `[80%, 88%]` or `[71%, 97%]`?) and, with
+`--threshold 0.8`, tests whether the model actually clears your bar.
+
 See [`docs/checks.md`](docs/checks.md) for the methods and thresholds behind each
 one.
 

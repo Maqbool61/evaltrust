@@ -11,6 +11,7 @@ from ..core.schema import EvalData, Finding, Status
 from .benchmark_health import audit_benchmark_health
 from .judge_calibration import audit_judge_calibration
 from .judge_reliability import audit_judge_reliability
+from .single import audit_single
 from .repeatability import audit_repeatability
 from .statistical import audit_statistical_validity
 from .verdict import Verdict, VerdictLevel, compute_verdict, enforce_level
@@ -19,12 +20,16 @@ from .verdict import Verdict, VerdictLevel, compute_verdict, enforce_level
 @dataclass(frozen=True)
 class AuditReport:
     model_a: str
-    model_b: str
+    model_b: str | None          # None for a single-model audit
     n_examples: int
     source_format: str
     findings: list[Finding]
     verdict: Verdict
     models_available: list[str] = field(default_factory=list)
+
+    @property
+    def is_single(self) -> bool:
+        return self.model_b is None
 
     def raise_if_below(self, minimum: "str | VerdictLevel" = "moderate") -> "AuditReport":
         """Raise UntrustworthyError if confidence is below ``minimum``.
@@ -33,14 +38,15 @@ class AuditReport:
         trustworthy enough:  ``evaltrust.audit(results).raise_if_below("moderate")``.
         Returns self on success so it can be chained.
         """
-        enforce_level(self.verdict.level, minimum,
-                      context=f"{self.model_a} vs {self.model_b}")
+        subject = self.model_a if self.is_single else f"{self.model_a} vs {self.model_b}"
+        enforce_level(self.verdict.level, minimum, context=subject)
         return self
 
     def to_dict(self) -> dict:
         """A JSON-serializable representation of the whole audit."""
+        models = [self.model_a] if self.is_single else [self.model_a, self.model_b]
         return {
-            "models": [self.model_a, self.model_b],
+            "models": models,
             "model_a": self.model_a,
             "model_b": self.model_b,
             "models_available": self.models_available,
@@ -91,6 +97,7 @@ def run_audit(
     alpha: float = 0.05,
     equivalence_margin: float = 0.05,
     seed: int = 0,
+    threshold: float | None = None,
     config: "AuditConfig | None" = None,
 ) -> AuditReport:
     # A config bundles every threshold; when not given, build one from the loose
@@ -98,9 +105,24 @@ def run_audit(
     cfg = config or AuditConfig(alpha=alpha, equivalence_margin=equivalence_margin,
                                 seed=seed)
 
-    if model_a is None or model_b is None:
-        model_a, model_b = _pick_models(data)
+    # Dispatch: two models -> comparison; a threshold or a lone model -> single.
+    if model_a is not None and model_b is not None:
+        return _comparison(data, model_a, model_b, cfg)
+    if threshold is not None:
+        return _single(data, model_a or _strongest(data), threshold, cfg)
+    if len(data.models) == 1:
+        return _single(data, model_a or data.models[0], None, cfg)
+    model_a, model_b = _pick_models(data)
+    return _comparison(data, model_a, model_b, cfg)
 
+
+def _strongest(data: EvalData) -> str:
+    if not data.models:
+        raise ValueError("EvalTrust needs at least one model to audit.")
+    return max(data.models, key=lambda m: _mean_score(data, m))
+
+
+def _comparison(data, model_a, model_b, cfg) -> AuditReport:
     if data.differences(model_a, model_b).size == 0:
         raise ValueError(
             f"No examples have scores for both '{model_a}' and '{model_b}', so "
@@ -128,11 +150,19 @@ def run_audit(
         reference_judge=cfg.reference_judge)
 
     return AuditReport(
-        model_a=model_a,
-        model_b=model_b,
-        n_examples=data.n_examples,
-        source_format=data.source_format,
-        findings=findings,
-        verdict=compute_verdict(findings),
-        models_available=list(data.models),
-    )
+        model_a=model_a, model_b=model_b, n_examples=data.n_examples,
+        source_format=data.source_format, findings=findings,
+        verdict=compute_verdict(findings), models_available=list(data.models))
+
+
+def _single(data, model, threshold, cfg) -> AuditReport:
+    findings: list[Finding] = []
+    dq = _data_quality(data)
+    if dq is not None:
+        findings.append(dq)
+    findings += audit_single(data, model, threshold=threshold, config=cfg)
+
+    return AuditReport(
+        model_a=model, model_b=None, n_examples=data.n_examples,
+        source_format=data.source_format, findings=findings,
+        verdict=compute_verdict(findings), models_available=list(data.models))

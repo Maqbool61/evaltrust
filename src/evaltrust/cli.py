@@ -68,6 +68,9 @@ def audit(
     reference_judge: Optional[str] = typer.Option(
         None, "--reference-judge",
         help="Name of the human/gold judge to calibrate the AI judges against."),
+    threshold: Optional[float] = typer.Option(
+        None, "--threshold",
+        help="For a single-model eval, the target score to test against (e.g. 0.8)."),
     strict: bool = typer.Option(
         False, "--strict", help="Exit non-zero if confidence is Low."),
     fail_under: Optional[str] = typer.Option(
@@ -116,7 +119,8 @@ def audit(
                     suite, model_a=model_a, model_b=model_b, config=cfg)
             else:
                 data = next(iter(suite.values()))
-                report = run_audit(data, model_a=model_a, model_b=model_b, config=cfg)
+                report = run_audit(data, model_a=model_a, model_b=model_b,
+                                   threshold=threshold, config=cfg)
     except FileNotFoundError as e:
         _err.print(f"[red]{e}[/red]")
         raise typer.Exit(code=2)

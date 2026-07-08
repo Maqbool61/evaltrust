@@ -47,11 +47,21 @@ def test_unknown_format_exits_nonzero(tmp_path):
     assert result.exit_code != 0
 
 
-def test_single_model_exits_with_helpful_message(tmp_path):
-    raw = {"models": ["A"], "examples": [{"id": "1", "scores": {"A": 1}}]}
+def test_single_model_file_is_audited_for_score_reliability(tmp_path):
+    raw = {"models": ["A"], "examples": [
+        {"id": str(i), "scores": {"A": i % 2}} for i in range(100)]}
     result = runner.invoke(app, ["audit", write(tmp_path, "one.json", raw)])
-    assert result.exit_code != 0
-    assert "two models" in result.stdout.lower()
+    assert result.exit_code == 0
+    assert "Score Reliability" in result.stdout
+
+
+def test_single_model_threshold_gate(tmp_path):
+    # 50% model, target 0.8 -> below -> fail-under gate trips.
+    raw = {"models": ["A"], "examples": [
+        {"id": str(i), "scores": {"A": i % 2}} for i in range(200)]}
+    result = runner.invoke(app, ["audit", write(tmp_path, "one.json", raw),
+                                 "--threshold", "0.8", "--fail-under", "moderate"])
+    assert result.exit_code == 1
 
 
 def test_strict_flag_fails_on_low_confidence(tmp_path):

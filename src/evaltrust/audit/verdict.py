@@ -82,6 +82,31 @@ def _decision_outcome(findings: list[Finding]) -> str | None:
     return None
 
 
+def _find(findings, check):
+    for f in findings:
+        if f.details.get("check") == check:
+            return f
+    return None
+
+
+def _single_summary(findings: list[Finding]) -> str | None:
+    """Summary for a single-model audit (score reliability, not a comparison)."""
+    thresh = _find(findings, "threshold")
+    if thresh is not None:
+        return {
+            "above": "The model clears the target. You can rely on it.",
+            "below": "The model is below the target. It's not ready against this bar.",
+            "inconclusive": ("Too close to the target to be sure. Collect more "
+                             "examples before deciding."),
+        }.get(thresh.details.get("outcome"))
+    prec = _find(findings, "single_precision")
+    if prec is not None:
+        return ("The score is measured precisely enough to trust."
+                if prec.details.get("precise")
+                else "The score is too imprecise to trust yet. Collect more examples.")
+    return None
+
+
 @dataclass(frozen=True)
 class Verdict:
     level: VerdictLevel
@@ -114,5 +139,7 @@ def compute_verdict(findings: list[Finding]) -> Verdict:
         level, drivers = VerdictLevel.HIGH, []
 
     outcome = _decision_outcome(findings)
-    summary = _OUTCOME_SUMMARY.get(outcome, _SUMMARY[level])
+    summary = (_OUTCOME_SUMMARY.get(outcome)
+               or _single_summary(findings)
+               or _SUMMARY[level])
     return Verdict(level, summary, drivers)
