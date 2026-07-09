@@ -46,6 +46,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   it switches from exact-match agreement to a Spearman rank correlation against
   the reference judge, and names the metric in the finding so a correlation is
   never mistaken for an agreement rate. Binary pass/fail judges are unchanged.
+- **Holm-Bonferroni now carries its rejection decision** into each metric's audit
+  instead of reconstructing an effective alpha to re-derive it under a strict
+  `p < alpha`; the reported per-metric `alpha` is the exact Holm step threshold,
+  with no ULP nudge on the exact-tie boundary. Verdicts are unchanged.
 
 ## [0.5.0] — 2026-07-08
 

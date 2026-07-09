@@ -152,3 +152,47 @@ def test_is_deterministic():
     f1 = audit_statistical_validity(data, "A", "B", seed=1)
     f2 = audit_statistical_validity(data, "A", "B", seed=1)
     assert [f.details for f in f1] == [f.details for f in f2]
+
+
+def test_significant_override_lets_a_procedure_own_the_decision():
+    # A multiplicity procedure can OWN the significance call: passing `significant`
+    # bypasses the strict `p < alpha`. `None` (the default) is a byte-for-byte
+    # no-op, so every existing caller is unchanged.
+    win = make_data([0] * 200, [1] * 180 + [0] * 20)      # a clear, significant win
+    base = audit_statistical_validity(win, "A", "B", seed=0)
+    none = audit_statistical_validity(win, "A", "B", seed=0, significant=None)
+    assert [f.to_dict() for f in base] == [f.to_dict() for f in none]
+    assert by_check(base, "decision").details["p_value"] < 0.05     # really significant
+
+    # Force NOT significant despite p < alpha -> the audit honours the override.
+    off = by_check(
+        audit_statistical_validity(win, "A", "B", seed=0, significant=False), "decision")
+    assert off.details["outcome"] != "significant"
+
+    # Force significant on data whose p >= alpha -> outcome follows the override.
+    rng = np.random.default_rng(0)
+    flat = rng.normal(0.5, 0.1, size=60)
+    tie = make_data(flat, flat + rng.normal(0.0, 0.001, size=60))
+    assert by_check(audit_statistical_validity(tie, "A", "B", seed=0),
+                    "decision").details["p_value"] >= 0.05
+    on = by_check(
+        audit_statistical_validity(tie, "A", "B", seed=0, significant=True), "decision")
+    assert on.details["outcome"] == "significant"
+
+
+def test_equivalence_ci_and_decision_prose_share_the_reported_alpha():
+    # The TOST equivalence interval uses `1 - 2*alpha` and the `equivalent` prose
+    # quotes that same interval. Post-refactor `alpha` is the metric's Holm STEP
+    # THRESHOLD, and BOTH the interval and the prose read from it, so they cannot
+    # drift. With alpha = 0.025 (a Holm step at k=2), the quoted interval must be
+    # 1 - 2*0.025 = 95%.
+    rng = np.random.default_rng(0)
+    a = rng.normal(0.5, 0.1, size=400)
+    b = a + rng.normal(0.0, 0.001, size=400)              # essentially identical
+    dec = by_check(
+        audit_statistical_validity(make_data(a, b), "A", "B", alpha=0.025,
+                                   equivalence_margin=0.05, seed=0, significant=False),
+        "decision")
+    assert dec.details["outcome"] == "equivalent"
+    assert dec.details["alpha"] == 0.025
+    assert "95%" in dec.how_detected      # round((1 - 2*0.025) * 100) == 95

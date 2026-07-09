@@ -42,7 +42,19 @@ def audit_statistical_validity(
     confidence: float = 0.95,
     n_resamples: int = 10_000,
     seed: int = 0,
+    *,
+    significant: bool | None = None,
 ) -> list[Finding]:
+    """Audit whether the gap between two models is real, meaningful evidence.
+
+    ``significant`` normally stays ``None``, and this check makes the significance
+    call itself with a strict ``p < alpha``. A multiplicity procedure (Holm) that
+    has already decided rejection at the family level can instead OWN that call and
+    pass the result in as ``significant``; then the ``p < alpha`` comparison is not
+    performed, and ``alpha`` is only the metric's step threshold — reported in the
+    decision prose and used for the TOST equivalence interval (``1 - 2*alpha``) —
+    rather than the operative test. Every other output is unchanged.
+    """
     raw = data.differences(model_a, model_b)  # score_b - score_a
     n = int(raw.size)
 
@@ -65,7 +77,9 @@ def audit_statistical_validity(
         p = permutation_test(diffs, n_resamples=n_resamples, seed=seed)
         test_name = "a paired permutation test"
         test_detail = f"{n} paired examples"
-    significant = p < alpha
+    # Strict `p < alpha` unless a multiplicity procedure supplied the decision.
+    if significant is None:
+        significant = p < alpha
 
     # --- confidence interval (leader-minus-trailer) ---
     lo, hi = bootstrap_ci(diffs, confidence=confidence,
