@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from importlib.metadata import PackageNotFoundError, version as package_version
 from pathlib import Path
 from typing import List, Optional
 
@@ -42,8 +43,26 @@ app = typer.Typer(
 _err = Console(stderr=False)  # keep errors on stdout so they're easy to capture
 
 
+def _version_callback(value: bool) -> None:
+    if not value:
+        return
+    try:
+        typer.echo(package_version("evaltrust"))
+    except PackageNotFoundError:
+        typer.echo("unknown")
+    raise typer.Exit()
+
+
 @app.callback()
-def main() -> None:
+def main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show the installed evaltrust version and exit.",
+    ),
+) -> None:
     """EvalTrust: you ran an eval and got a score gap between two models. This
     tells you whether that gap is a real improvement or just luck, before you
     ship on it."""
