@@ -362,21 +362,23 @@ def test_ungated_metric_does_not_affect_gate():
     assert report.overall_level is VerdictLevel.LOW
 
 
-def test_metric_weights_favour_high_scoring_metric():
-    """Weights de-emphasise the weak metric but the weakest-metric floor still applies.
+def test_metric_weights_stored_but_do_not_affect_rollup():
+    """metric_weights are validated and stored but don't change overall_level yet.
 
-    Without a gate the suite cannot be lifted above the un-weighted minimum:
-    correctness=HIGH weight=9, noise=LOW weight=1 → weighted avg = 1.8 → HIGH,
-    but the floor is LOW (the weakest metric), so overall_level stays LOW.
+    Weighting changes the --fail-under contract and will land in a follow-up PR.
+    With or without weights, overall_level is the weakest metric.
     """
     suite = {
         "correctness": metric_data([0] * 200, [1] * 180 + [0] * 20),  # HIGH
         "noise": metric_data([0, 1] * 60, [1, 0] * 60),               # LOW
     }
-    cfg = AuditConfig(metric_weights={"correctness": 9.0, "noise": 1.0})
-    report = audit_suite(suite, config=cfg, seed=0)
-    # Floor: the suite can never exceed its weakest metric under --fail-under.
-    assert report.overall_level is VerdictLevel.LOW
+    no_weights = audit_suite(suite, seed=0)
+    with_weights = audit_suite(
+        suite, config=AuditConfig(metric_weights={"correctness": 9.0, "noise": 1.0}),
+        seed=0)
+    # Both return the weakest metric — weights don't change the rollup yet.
+    assert no_weights.overall_level is VerdictLevel.LOW
+    assert with_weights.overall_level is VerdictLevel.LOW
 
 
 def test_metric_weights_default_behaviour_unchanged():
@@ -400,50 +402,11 @@ def test_unknown_gated_metric_is_ignored():
 
 
 # ---------------------------------------------------------------------------
-# Reviewer follow-up: semantic and contract fixes
+# Reviewer follow-up: contract fixes
 # ---------------------------------------------------------------------------
 
-def test_weights_cannot_lift_suite_above_weakest_metric():
-    """Weights never let overall_level exceed the un-weighted weakest-metric minimum.
-
-    This is the weakest-metric floor: --fail-under consumers are protected even
-    when metric_weights is non-empty and the weighted average would be higher.
-    """
-    suite = {
-        "correctness": metric_data([0] * 200, [1] * 180 + [0] * 20),  # HIGH
-        "safety": metric_data([0, 1] * 60, [1, 0] * 60),              # LOW
-    }
-    # Extreme weight on correctness would push weighted avg to ~1.8 → HIGH
-    # without the floor.  With the floor it must stay at LOW.
-    cfg = AuditConfig(metric_weights={"correctness": 99.0, "safety": 1.0})
-    report = audit_suite(suite, config=cfg, seed=0)
-    assert report.overall_level is VerdictLevel.LOW
-
-
-def test_weights_can_lower_suite_below_unweighted_level():
-    """Weights *can* pull the suite down (de-emphasise nothing prevents sinking)."""
-    suite = {
-        "correctness": metric_data([0] * 200, [1] * 180 + [0] * 20),  # HIGH
-        "style": metric_data([0] * 200, [1] * 180 + [0] * 20),        # HIGH
-    }
-    # Both are HIGH so weakest = HIGH; a uniformly weighted suite stays HIGH.
-    cfg = AuditConfig(metric_weights={"correctness": 1.0, "style": 1.0})
-    report = audit_suite(suite, config=cfg, seed=0)
-    assert report.overall_level is VerdictLevel.HIGH
-
-
-def test_uniform_weights_same_as_no_weights_when_all_equal():
-    """Uniform weights on an all-HIGH suite still yield HIGH."""
-    suite = {"a": metric_data([0] * 200, [1] * 180 + [0] * 20),
-             "b": metric_data([0] * 200, [1] * 180 + [0] * 20)}
-    no_weights = audit_suite(suite, seed=0)
-    with_weights = audit_suite(
-        suite, config=AuditConfig(metric_weights={"a": 1.0, "b": 1.0}), seed=0)
-    assert no_weights.overall_level is with_weights.overall_level
-
-
 def test_gated_metric_fires_before_weights_are_applied():
-    """A gated LOW metric forces LOW even when weights would compute HIGH."""
+    """A gated LOW metric forces LOW even when metric_weights are set."""
     suite = {
         "safety": metric_data([0, 1] * 60, [1, 0] * 60),              # LOW
         "correctness": metric_data([0] * 200, [1] * 180 + [0] * 20),  # HIGH
@@ -457,13 +420,11 @@ def test_gated_metric_fires_before_weights_are_applied():
 
 
 def test_unknown_weight_names_do_not_turn_on_averaging():
-    """Weight names not present in the suite are ignored; if none match, fall back
-    to weakest-metric (no averaging side-effect from a misspelled name)."""
+    """metric_weights with no matching suite metrics falls back to weakest-metric."""
     suite = {
         "correctness": metric_data([0] * 200, [1] * 180 + [0] * 20),  # HIGH
         "safety": metric_data([0, 1] * 60, [1, 0] * 60),              # LOW
     }
-    # Weights only name non-existent metrics → no relevant weights → fallback.
     cfg = AuditConfig(metric_weights={"nonexistent_metric": 9.0})
     report = audit_suite(suite, config=cfg, seed=0)
     assert report.overall_level is VerdictLevel.LOW

@@ -6,6 +6,7 @@ in ``pyproject.toml``.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from types import MappingProxyType
@@ -31,6 +32,10 @@ def _validate_weights(weights: dict) -> None:
         if w <= 0:
             raise ValueError(
                 f"metric_weights: weight for {name!r} must be positive, got {w!r}."
+            )
+        if not math.isfinite(w):
+            raise ValueError(
+                f"metric_weights: weight for {name!r} must be finite, got {w!r}."
             )
 
 

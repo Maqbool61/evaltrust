@@ -108,6 +108,18 @@ def test_negative_weight_raises_value_error():
         AuditConfig(metric_weights={"safety": -5.0})
 
 
+def test_nan_weight_raises_value_error():
+    import math
+    with pytest.raises(ValueError, match="finite"):
+        AuditConfig(metric_weights={"correctness": math.nan})
+
+
+def test_inf_weight_raises_value_error():
+    import math
+    with pytest.raises(ValueError, match="finite"):
+        AuditConfig(metric_weights={"correctness": math.inf})
+
+
 def test_from_dict_coerces_gated_metrics_list_to_frozenset():
     cfg = AuditConfig.from_dict({"gated_metrics": ["safety", "toxicity"]})
     assert isinstance(cfg.gated_metrics, frozenset)
@@ -129,6 +141,18 @@ def test_from_dict_rejects_zero_weight():
 def test_from_dict_rejects_negative_weight():
     with pytest.raises(ValueError, match="positive"):
         AuditConfig.from_dict({"metric_weights": {"style": -1.0}})
+
+
+def test_from_dict_rejects_nan_weight():
+    import math
+    with pytest.raises(ValueError, match="finite"):
+        AuditConfig.from_dict({"metric_weights": {"correctness": math.nan}})
+
+
+def test_from_dict_rejects_inf_weight():
+    import math
+    with pytest.raises(ValueError, match="finite"):
+        AuditConfig.from_dict({"metric_weights": {"correctness": math.inf}})
 
 
 def test_load_gated_and_weights_from_toml(tmp_path):

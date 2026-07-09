@@ -45,14 +45,14 @@ class SuiteReport:
 
         1. **Gate check** — if any gated metric (``_config_gated``) is below
            HIGH the whole suite is LOW, regardless of every other metric.
-        2. **Weighted floor** — if ``_config_weights`` is non-empty, compute a
-           weight-averaged rank and map it back to a VerdictLevel, but the
-           result is *floored* at the weakest metric so weights can only
-           de-emphasise metrics, never mask a failure from ``--fail-under``.
-        3. **Fallback** — plain weakest-metric (original behaviour).
+        2. **Fallback** — plain weakest-metric (original behaviour).
 
-        Only named metrics present in the suite are considered; unknown gate or
-        weight names are silently ignored.
+        Only named metrics present in the suite are considered; unknown gate
+        names are silently ignored.
+
+        Note: ``_config_weights`` is validated and stored but not yet used in
+        rollup — weighting changes the ``--fail-under`` contract and will land
+        in a follow-up PR once that contract is settled.
         """
         levels = {m: r.verdict.level for m, r in self.reports.items()}
 
@@ -61,39 +61,8 @@ class SuiteReport:
             if metric in self._config_gated and level is not VerdictLevel.HIGH:
                 return VerdictLevel.LOW
 
-        # Compute the weakest metric — used both as the fallback and as the
-        # floor when weights are active.
-        weakest = min(levels.values(), key=lambda lvl: _RANK[lvl])
-
-        # 2. Weighted average with a weakest-metric floor.
-        if self._config_weights:
-            # Only weight metrics that are both named in the suite AND in the
-            # weight map; unknown weight names simply don't participate.
-            relevant = {m: lvl for m, lvl in levels.items()
-                        if m in self._config_weights}
-            if relevant:
-                total_w = sum(self._config_weights[m] for m in relevant)
-                avg_rank = sum(
-                    _RANK[lvl] * self._config_weights[m] / total_w
-                    for m, lvl in relevant.items()
-                )
-                # Map averaged rank → VerdictLevel.
-                if avg_rank < 0.5:
-                    weighted_level = VerdictLevel.LOW
-                elif avg_rank < 1.5:
-                    weighted_level = VerdictLevel.MODERATE
-                else:
-                    weighted_level = VerdictLevel.HIGH
-                # Floor: weights can reduce a metric's influence but cannot
-                # lift the suite above what the un-weighted weakest-metric
-                # rule would give.  This preserves the "only as trustworthy
-                # as its weakest metric" guarantee for --fail-under consumers.
-                return (weakest
-                        if _RANK[weighted_level] > _RANK[weakest]
-                        else weighted_level)
-
-        # 3. Default: weakest metric wins.
-        return weakest
+        # 2. Default: weakest metric wins.
+        return min(levels.values(), key=lambda lvl: _RANK[lvl])
 
     def raise_if_below(self, minimum: "str | VerdictLevel" = "moderate") -> "SuiteReport":
         """Raise UntrustworthyError if the suite's overall confidence is below
