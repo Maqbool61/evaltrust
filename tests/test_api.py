@@ -94,3 +94,14 @@ def test_audit_suite_from_a_file(tmp_path):
     p.write_text(json.dumps(rows))
     report = audit_suite(str(p))
     assert set(report.reports.keys()) == {"m1", "m2"}
+
+
+def test_audit_suite_correction_is_threaded_through():
+    suite = {
+        "correctness": make_data({"A": [0] * 200, "B": [1] * 180 + [0] * 20}, 200),
+        "tone": make_data({"A": [0, 1] * 60, "B": [1, 0] * 60}, 120),
+    }
+    bonf = audit_suite(suite)                     # default
+    holm = audit_suite(suite, correction="holm")
+    assert "bonferroni" in bonf.correction.lower()
+    assert "holm" in holm.correction.lower()

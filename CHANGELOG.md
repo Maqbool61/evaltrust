@@ -12,6 +12,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Read line-delimited JSON (`.jsonl`) results — one record per line — through the
   existing record pipeline, with the same `metric`-column suite handling and
   skipped-row reporting as CSV. A malformed line fails with its line number.
+- **Holm-Bonferroni correction for multi-metric suites.** `audit_suite` (and
+  `--correction` / the `correction` config key) now accept `bonferroni`
+  (default, unchanged), `holm`, or `none`. Holm is a step-down refinement that
+  rejects at least as many metrics as Bonferroni at the same family-wise error
+  rate; each metric is re-run at its Holm-effective alpha so its verdict, prose,
+  and equivalence interval stay consistent. `SuiteReport` gains `metric_alphas`
+  and `adjusted_p`.
 
 ### Fixed
 

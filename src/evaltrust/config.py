@@ -30,6 +30,7 @@ class AuditConfig:
     reference_judge: str | None = None      # judge treated as ground truth (else auto)
     n_resamples: int = 10_000               # bootstrap / permutation resamples
     seed: int = 0                           # RNG seed (reproducibility)
+    correction: str = "bonferroni"          # multi-metric correction: bonferroni | holm | none
 
     @classmethod
     def from_dict(cls, data: dict) -> "AuditConfig":

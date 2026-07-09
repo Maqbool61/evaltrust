@@ -44,6 +44,41 @@ def noise_file(tmp_path):
     return write(tmp_path, "noise.json", raw)
 
 
+def suite_file(tmp_path):
+    # Two metrics: "strong" (20 discordant pairs, tiny p) and "borderline"
+    # (10 vs 2 discordant pairs, p = 0.0386, between alpha/2 and alpha).
+    rows = []
+    for i in range(20):
+        rows += [{"id": f"s{i}", "model": "A", "metric": "strong", "score": 0},
+                 {"id": f"s{i}", "model": "B", "metric": "strong", "score": 1}]
+    for i in range(10):
+        rows += [{"id": f"b{i}", "model": "A", "metric": "borderline", "score": 0},
+                 {"id": f"b{i}", "model": "B", "metric": "borderline", "score": 1}]
+    for i in range(2):
+        rows += [{"id": f"c{i}", "model": "A", "metric": "borderline", "score": 1},
+                 {"id": f"c{i}", "model": "B", "metric": "borderline", "score": 0}]
+    return write(tmp_path, "suite.json", rows)
+
+
+def test_correction_flag_selects_holm(tmp_path):
+    out = runner.invoke(
+        app, ["audit", suite_file(tmp_path), "--correction", "holm", "--json"])
+    assert out.exit_code == 0
+    payload = json.loads(out.stdout)
+    assert "holm" in payload["correction"].lower()
+    # Holm rejects the borderline metric that Bonferroni cannot.
+    bonf = runner.invoke(
+        app, ["audit", suite_file(tmp_path), "--correction", "bonferroni", "--json"])
+    bonf_payload = json.loads(bonf.stdout)
+    assert "bonferroni" in bonf_payload["correction"].lower()
+
+
+def test_bad_correction_value_errors(tmp_path):
+    result = runner.invoke(
+        app, ["audit", suite_file(tmp_path), "--correction", "banana"])
+    assert result.exit_code == 2
+
+
 def test_audit_prints_report_and_exits_zero(tmp_path):
     result = runner.invoke(app, ["audit", clean_win_file(tmp_path)])
     assert result.exit_code == 0

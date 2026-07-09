@@ -19,6 +19,15 @@ def test_from_dict_ignores_unknown_keys():
     assert c.alpha == 0.01
 
 
+def test_correction_defaults_to_bonferroni():
+    assert AuditConfig().correction == "bonferroni"
+
+
+def test_correction_is_loadable_from_a_toml(tmp_path):
+    (tmp_path / ".evaltrust.toml").write_text('correction = "holm"\n')
+    assert AuditConfig.load(start_dir=str(tmp_path)).correction == "holm"
+
+
 def test_load_reads_a_dedicated_toml(tmp_path):
     (tmp_path / ".evaltrust.toml").write_text(
         "alpha = 0.01\nequivalence_margin = 0.1\njudge_agreement_threshold = 0.9\n")

@@ -83,6 +83,9 @@ def audit(
         help="Largest score gap considered practically negligible (for equivalence)."),
     seed: Optional[int] = typer.Option(
         None, "--seed", help="Seed for reproducible resampling."),
+    correction: Optional[str] = typer.Option(
+        None, "--correction",
+        help="Multi-metric correction: bonferroni (default), holm, or none."),
     config_path: Optional[str] = typer.Option(
         None, "--config", help="Path to a config TOML (default: .evaltrust.toml or pyproject)."),
     reference_judge: Optional[str] = typer.Option(
@@ -124,7 +127,8 @@ def audit(
     overrides = {k: v for k, v in (("alpha", alpha),
                                    ("equivalence_margin", equivalence_margin),
                                    ("seed", seed),
-                                   ("reference_judge", reference_judge))
+                                   ("reference_judge", reference_judge),
+                                   ("correction", correction))
                  if v is not None}
     cfg = replace(cfg, **overrides)
 

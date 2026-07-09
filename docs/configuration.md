@@ -47,6 +47,26 @@ saturation_fraction = 0.9
 | `reference_judge` | *(auto)* | Name of the human/gold judge to calibrate against (else auto-detected). |
 | `n_resamples` | `10000` | Bootstrap / permutation resamples. |
 | `seed` | `0` | RNG seed (reproducibility). |
+| `correction` | `"bonferroni"` | Multiple-comparison correction for a multi-metric suite: `bonferroni`, `holm`, or `none`. |
+
+## Multi-metric correction
+
+When a file scores several metrics, testing them all at the same `alpha` inflates
+false positives, so EvalTrust corrects the significance threshold for the number
+of metrics. Choose the method with `correction` (or `--correction` on the CLI):
+
+- **`bonferroni`** (default) — divide the threshold by the number of metrics
+  (`alpha / k`). Simple and strict.
+- **`holm`** — Holm-Bonferroni, a step-down refinement that rejects at least as
+  many metrics as Bonferroni at the same family-wise error rate, so a genuine win
+  is less likely to be missed. It costs a second pass over the resampling.
+- **`none`** — audit each metric at the raw `alpha` with no correction.
+
+```toml
+correction = "holm"
+```
+
+Or per run: `evaltrust audit results.json --correction holm`.
 
 ## From Python
 
