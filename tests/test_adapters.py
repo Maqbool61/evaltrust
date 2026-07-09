@@ -229,6 +229,52 @@ def test_openevals_auto_detected_by_registry():
     assert adapter.source_format == "openevals"
 
 
+def test_openevals_skips_and_counts_unreadable_score():
+    # One junk cell must not sink the whole file: skip it, keep the good rows,
+    # and count it so the Data Quality finding reflects the drop (like the
+    # Inspect and CSV paths).
+    raw = [
+        {"key": "correctness", "score": 1.0, "input": "q1"},
+        {"key": "correctness", "score": "banana", "input": "q2"},  # unreadable
+        {"key": "correctness", "score": 0.0, "input": "q3"},
+    ]
+    data = OpenEvalsAdapter().parse(raw)
+    assert data.n_examples == 2
+    assert data.metadata["skipped_rows"] == 1
+
+
+def test_openevals_counts_missing_score_as_skipped():
+    raw = [
+        {"key": "correctness", "score": 1.0, "input": "q1"},
+        {"key": "correctness", "score": None, "input": "q2"},  # missing
+    ]
+    data = OpenEvalsAdapter().parse(raw)
+    assert data.n_examples == 1
+    assert data.metadata["skipped_rows"] == 1
+
+
+def test_openevals_records_metadata_when_all_rows_are_clean():
+    data = OpenEvalsAdapter().parse(OPENEVALS_SAMPLE)
+    assert data.metadata["skipped_rows"] == 0
+
+
+def test_openevals_does_not_merge_distinct_rows_sharing_an_input():
+    # Two separate evaluations that happen to share the same input text are
+    # distinct examples, not repeated runs of one -- they must not be merged.
+    raw = [
+        {"key": "correctness", "score": 1.0, "input": "same prompt"},
+        {"key": "correctness", "score": 0.0, "input": "same prompt"},
+    ]
+    data = OpenEvalsAdapter().parse(raw)
+    assert data.n_examples == 2
+
+
+def test_openevals_prefers_explicit_id_field():
+    raw = [{"key": "correctness", "score": 1.0, "id": "case-7", "input": "q"}]
+    data = OpenEvalsAdapter().parse(raw)
+    assert data.examples[0].id == "case-7"
+
+
 # ---------------------------------------------------------------------------
 # Inspect (UK AISI) .json eval logs
 # ---------------------------------------------------------------------------
