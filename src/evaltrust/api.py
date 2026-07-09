@@ -34,6 +34,8 @@ def audit(
 
     ``source`` is a results file (JSON/JSONL/CSV), two single-model files to pair,
     or an :class:`EvalData`. ``model_a`` / ``model_b`` pick or label the two models.
+    ``threshold`` is used only for single-model audits; it is ignored for two-model
+    comparisons.
     """
     kw = dict(alpha=alpha, equivalence_margin=equivalence_margin,
               threshold=threshold, seed=seed)
@@ -47,7 +49,9 @@ def audit(
             data = load(paths[0])
             return run_audit(data, model_a=model_a, model_b=model_b, **kw)
         data = load_comparison(paths, label_a=model_a, label_b=model_b)
-        return run_audit(data, **kw)
+        # Two-model comparison ignores threshold (single-model parameter)
+        kw_comparison = {k: v for k, v in kw.items() if k != 'threshold'}
+        return run_audit(data, **kw_comparison)
 
     data = load(source)
     return run_audit(data, model_a=model_a, model_b=model_b, **kw)

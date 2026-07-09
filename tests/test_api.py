@@ -105,3 +105,38 @@ def test_audit_suite_correction_is_threaded_through():
     holm = audit_suite(suite, correction="holm")
     assert "bonferroni" in bonf.correction.lower()
     assert "holm" in holm.correction.lower()
+
+
+def test_threshold_is_ignored_for_two_model_comparison(tmp_path):
+    # Create two single-model files
+    for name, model, rate in [("a.json", "gpt", 0.5), ("b.json", "claude", 0.5)]:
+        (tmp_path / name).write_text(json.dumps({"models": [model], "examples": [
+            {"id": str(i), "scores": {model: 1 if i < int(100 * rate) else 0}}
+            for i in range(100)]}))
+
+    # Two-file comparison should give the same result with or without threshold
+    report_without_threshold = audit([str(tmp_path / "a.json"), str(tmp_path / "b.json")])
+    report_with_threshold = audit([str(tmp_path / "a.json"), str(tmp_path / "b.json")],
+                                   threshold=0.9)
+
+    # Results should be identical (threshold is ignored for comparisons)
+    assert report_without_threshold.verdict.level == report_with_threshold.verdict.level
+    assert len(report_without_threshold.findings) == len(report_with_threshold.findings)
+
+
+def test_threshold_is_used_for_single_model_audit(tmp_path):
+    # Create a single-model file with 70% score
+    p = tmp_path / "model.json"
+    p.write_text(json.dumps({"models": ["A"], "examples": [
+        {"id": str(i), "scores": {"A": 1 if i < 70 else 0}}
+        for i in range(100)]}))
+
+    # With threshold=0.5, should pass (70% > 50%)
+    report_low_threshold = audit(str(p), threshold=0.5)
+    assert any("target" in f.title.lower() or "threshold" in f.title.lower()
+               for f in report_low_threshold.findings)
+
+    # With threshold=0.9, should fail (70% < 90%)
+    report_high_threshold = audit(str(p), threshold=0.9)
+    assert any("target" in f.title.lower() or "threshold" in f.title.lower()
+               for f in report_high_threshold.findings)
