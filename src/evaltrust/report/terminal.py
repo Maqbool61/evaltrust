@@ -1,9 +1,7 @@
 """Render an audit report to the terminal.
 
-The default view is built to be read in a glance: the verdict and one line, the
-checks grouped by pillar, then a short list of what to do. The full reasoning for
-each flag (why it matters, how we measured it) is one `--explain` away, so the
-common case stays clean and the detail is there when you want it.
+Verdict, checks grouped by pillar, then what to do. Per-flag reasoning is one
+``--explain`` away.
 """
 
 from __future__ import annotations

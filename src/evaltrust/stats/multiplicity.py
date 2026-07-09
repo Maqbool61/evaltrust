@@ -1,9 +1,7 @@
 """Multiplicity corrections for testing several hypotheses at once.
 
-Testing ``k`` metrics at level ``alpha`` inflates the family-wise false-positive
-rate. Bonferroni (``alpha / k`` per metric) is the blunt fix; Holm-Bonferroni is
-a step-down refinement that controls the same error rate while rejecting at least
-as many hypotheses.
+Testing ``k`` metrics at ``alpha`` inflates the false-positive rate. Bonferroni
+(``alpha / k``) is the blunt fix; Holm-Bonferroni is a more powerful step-down.
 """
 
 from __future__ import annotations
@@ -18,14 +16,8 @@ def holm_bonferroni(
 ) -> tuple[list[bool], list[float]]:
     """Holm-Bonferroni step-down correction.
 
-    Orders the p-values ascending, compares the i-th smallest against
-    ``alpha / (k - i)``, and rejects from the smallest upward, stopping at the
-    first failure. Returns, in the original input order, the reject/keep flags and
-    the Holm-adjusted p-values (monotone, clipped to 1.0), where
-    ``adjusted_p[i] <= alpha`` exactly when hypothesis ``i`` is rejected.
-
-    Matches ``statsmodels.stats.multitest.multipletests(pvals, alpha,
-    method="holm")``, including ties, ``k == 1``, and boundary p-values.
+    Returns, in input order, the reject/keep flags and Holm-adjusted p-values.
+    Matches ``statsmodels.stats.multitest.multipletests(..., method="holm")``.
     """
     p = np.asarray(pvalues, dtype=float)
     k = p.size

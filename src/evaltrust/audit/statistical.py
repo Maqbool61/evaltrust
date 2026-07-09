@@ -1,17 +1,8 @@
 """Statistical Validity audit.
 
-Is the reported gap between two models real evidence you can act on? Three
-findings:
-
-  1. decision    - significant, equivalent (same within a set margin), or
-                   inconclusive (not enough evidence either way).
-  2. effect_size - how big the gap is (Cohen's d, or a proportion effect size
-                   for pass/fail data).
-  3. precision   - whether the sample was large enough, via the minimum
-                   detectable effect rather than post-hoc power.
-
-Paired pass/fail data uses McNemar's exact test and a proportion effect size;
-continuous scores use a paired permutation test and Cohen's d.
+Three findings: decision (significant / equivalent / inconclusive), effect_size,
+and precision. Pass/fail data uses McNemar plus a proportion effect size;
+continuous scores use a permutation test plus Cohen's d.
 """
 
 from __future__ import annotations
@@ -43,11 +34,9 @@ def audit_statistical_validity(
 ) -> list[Finding]:
     """Audit whether the gap between two models is real, meaningful evidence.
 
-    ``significant`` normally stays ``None`` and this check decides significance
-    with a strict ``p < alpha``. A multiplicity procedure (Holm) that has already
-    decided rejection can pass the result in as ``significant``; then ``alpha`` is
-    only the metric's step threshold used for the TOST equivalence interval
-    (``1 - 2*alpha``), not the operative test.
+    ``significant`` stays ``None`` unless a multiplicity procedure (Holm) already
+    decided rejection and passes the result in; then ``alpha`` is only the step
+    threshold for the TOST interval, not the operative test.
     """
     raw = data.differences(model_a, model_b)  # score_b - score_a
     n = int(raw.size)

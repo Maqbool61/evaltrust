@@ -1,10 +1,7 @@
-"""Pair two single-system evaluation files into one A-vs-B comparison.
+"""Pair two single-model evaluation files into one A-vs-B comparison.
 
-Single-system tools (DeepEval, LangSmith, OpenEvals) evaluate one model per run,
-so their exports contain a single model. Point EvalTrust at two such files and it
-pairs them by example id into the canonical two-model shape. A file that already
-contains several models is audited directly; this path is only for the
-one-model-per-file case.
+Single-system tools (DeepEval, LangSmith, OpenEvals) export one model per run;
+this pairs two such files by example id. Multi-model files are audited directly.
 """
 
 from __future__ import annotations

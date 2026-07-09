@@ -50,11 +50,9 @@ def _find_record_list(raw) -> list | None:
 def dicts_to_records(rows: list[dict], skipped: list | None = None) -> list[Record]:
     """Extract (example, model, score) records from dict rows.
 
-    Handles long format (a model column and a score column) and wide format (one
-    score column per model). Non-numeric columns in wide format are ignored, so
-    free-text fields like the prompt aren't mistaken for models. A row with a
-    missing or unreadable score is skipped rather than crashing; if a ``skipped``
-    list is passed, a short reason is appended for each.
+    Handles long format (model + score columns) and wide format (one score column
+    per model, non-numeric columns ignored). Rows with an unreadable score are
+    skipped, with a reason appended to ``skipped`` if given.
     """
     keys = rows[0].keys()
     id_key = _first_alias(keys, ID_KEYS)

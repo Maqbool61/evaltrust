@@ -1,15 +1,8 @@
 """Audit a single model's evaluation.
 
-With one model there's nothing to compare against, so the question becomes "can I
-trust this score?":
-
-  - precision  - how tightly the score is pinned down. A bootstrap CI on the mean
-                 turns "84%" into "84%, give or take X"; a wide interval means too
-                 few examples to trust the number.
-  - threshold  - (optional) whether the model really clears a target, via a
-                 one-sample check of the CI against it.
-
-Benchmark health still applies and is included.
+With one model the question is "can I trust this score?": a bootstrap CI on the
+mean (precision), an optional check of that CI against a target (threshold), plus
+benchmark health.
 """
 
 from __future__ import annotations

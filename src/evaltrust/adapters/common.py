@@ -1,9 +1,7 @@
 """Shared ingestion primitives.
 
-Every eval tool ultimately reports: for this example, this model (or judge) got
-this score. We normalise everything to a stream of ``Record``s and group them
-here, so each adapter only has to answer "where are the rows and what are the
-columns called?"
+Normalises every tool's output to a stream of ``Record``s and groups them, so each
+adapter only has to say where the rows are and what the columns are called.
 """
 
 from __future__ import annotations
@@ -75,12 +73,8 @@ def records_to_evaldata(
 ) -> EvalData:
     """Group flat records into canonical examples.
 
-    Rules, in order of precedence per (example, model):
-      - If any record carries a judge, the model gets a per-judge score map and
-        its final score is the mean across judges.
-      - Otherwise, repeated records are treated as repeated runs; the final score
-        is the mean of the runs.
-      - A single record is simply that score.
+    Per (example, model): judge records become a per-judge map (score = mean over
+    judges); otherwise repeated records are runs (score = mean over runs).
     """
     if not records:
         raise ValueError("No records found to build an evaluation from")

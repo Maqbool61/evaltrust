@@ -17,18 +17,10 @@ def bootstrap_ci(
     seed: int = 0,
     method: str = "percentile",
 ) -> tuple[float, float]:
-    """Bootstrap CI for the mean of paired differences.
+    """Bootstrap CI for the mean of paired differences; excludes 0 -> distinguishable.
 
-    Resamples examples with replacement ``n_resamples`` times, recomputes the
-    mean difference each time, and reads a confidence interval off the bootstrap
-    distribution. An interval that excludes 0 means the models are
-    distinguishable at this level.
-
-    ``method`` is ``"percentile"`` (empirical percentile interval) or ``"bca"``
-    (bias-corrected and accelerated: shifts the percentiles for median bias and
-    skew, more accurate on skewed data). BCa falls back to the percentile
-    interval on degenerate samples where its correction is undefined (n == 1,
-    zero variance, or a bootstrap distribution entirely on one side of the mean).
+    ``method`` is ``"percentile"`` or ``"bca"`` (bias-corrected, more accurate on
+    skewed data; falls back to percentile on degenerate samples).
     """
     if method not in ("percentile", "bca"):
         raise ValueError(
@@ -65,11 +57,9 @@ def _bca_quantiles(
     lo_q: float,
     hi_q: float,
 ) -> tuple[float, float] | None:
-    """BCa-adjusted lower/upper quantiles (in ``[0, 1]``) for the mean.
+    """BCa-adjusted lower/upper quantiles for the mean, or ``None`` when undefined.
 
-    Returns ``None`` when the bias-correction or acceleration is undefined, so
-    the caller can fall back to the percentile interval. Mirrors the bias
-    correction and acceleration of ``scipy.stats.bootstrap(method="BCa")``.
+    Mirrors ``scipy.stats.bootstrap(method="BCa")``.
     """
     n = data.size
     if n < 2:
@@ -112,11 +102,8 @@ def permutation_test(
 ) -> float:
     """Two-sided paired permutation test that the mean difference is zero.
 
-    Under the null the two models are exchangeable per example, so any
-    difference could have had its sign flipped. Compares the observed |mean|
-    against the distribution of |mean| under random sign flips; no normality
-    assumed. Returns a Monte-Carlo p-value with the (count + 1) / (N + 1)
-    correction, so it never reports p == 0.
+    Compares the observed |mean| against its distribution under random sign flips.
+    Monte-Carlo p-value with the (count + 1) / (N + 1) correction, so never 0.
     """
     diffs = np.asarray(differences, dtype=float)
     if diffs.size == 0:

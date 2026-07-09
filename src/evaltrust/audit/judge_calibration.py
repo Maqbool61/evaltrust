@@ -1,15 +1,8 @@
 """Judge calibration: does the AI judge agree with the humans?
 
-If the file includes a human/gold judge alongside the AI judge(s), we treat it as
-ground truth and measure how well each AI judge matches it.
-
-Pass/fail judges use exact-match agreement. Continuous scores (a 1-5 rubric, say)
-use a Spearman rank correlation instead, since what matters for comparing models
-is whether the judge ranks examples like the humans do. The finding names which
-metric was used, so a correlation is never read as an agreement rate.
-
-Include human labels as a judge named ``gold``/``human``/``reference`` (etc.), or
-name the reference judge explicitly.
+Given a human/gold judge, measures how well each AI judge matches it: exact-match
+agreement for pass/fail scores, Spearman rank correlation for continuous ones.
+Include human labels as a judge named ``gold``/``human``/``reference`` (etc.).
 """
 
 from __future__ import annotations
@@ -30,10 +23,8 @@ REFERENCE_NAMES = {"gold", "human", "humans", "reference", "ground_truth",
 def _use_exact_match(data: EvalData, judges, models) -> bool:
     """True when calibration should use exact-match agreement, not correlation.
 
-    Agreement applies to binary 0/1 scores and to any non-numeric scores.
-    Correlation is used only when the scores are numeric and range beyond {0, 1}.
-    With no comparable scores, exact match is chosen so the no-data case stays
-    silent (returns ``[]``).
+    Exact match for binary 0/1 or non-numeric scores; correlation only when
+    scores are numeric and range beyond {0, 1}.
     """
     numeric: set[float] = set()
     for ex in data.examples:
@@ -76,9 +67,7 @@ def audit_judge_calibration(
 ) -> list[Finding]:
     """Return a calibration finding, or [] when there's nothing to calibrate.
 
-    Silent (returns []) when there are no judges or no reference judge. Binary
-    judge scores use exact-match agreement; continuous scores use a Spearman rank
-    correlation. ``threshold`` is the pass floor for whichever metric applies.
+    ``threshold`` is the pass floor (a fraction agreed, or a correlation).
     """
     if not data.has_judges:
         return []
@@ -152,13 +141,7 @@ def _calibration_correlation(
     data: EvalData, model_a: str, model_b: str, threshold: float,
     ref: str, others: list[str],
 ) -> list[Finding]:
-    """Spearman rank correlation for continuous judge scores.
-
-    Rank correlation asks whether the judge orders examples like the reference,
-    the right question for comparing models. ``threshold`` is a floor on the
-    correlation, and the finding names the metric so a rho isn't read as an
-    agreement rate.
-    """
+    """Spearman rank correlation for continuous judge scores."""
     correlations: dict[str, float] = {}
     max_points = 0
     for j in others:

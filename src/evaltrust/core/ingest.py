@@ -51,11 +51,9 @@ def _is_json_array_document(text: str) -> bool:
 def _parse_jsonl_dicts(text: str, name: str) -> list[dict]:
     """Parse line-delimited JSON into a list of record dicts.
 
-    Blank lines are ignored. We split only on ``\\r``/``\\n`` (never
-    ``str.splitlines()``), both of which JSON must escape inside a string, so a
-    Unicode line separator (U+2028/U+2029) inside a value can't tear a record in
-    two. A line that isn't a JSON object raises ``ValueError`` naming the 1-based
-    line number.
+    Splits only on ``\\r``/``\\n`` (not ``str.splitlines()``) so a Unicode line
+    separator inside a value can't tear a record. A non-object line raises
+    ``ValueError`` naming the 1-based line number.
     """
     normalised = text.replace("\r\n", "\n").replace("\r", "\n")
     rows: list[dict] = []
@@ -92,11 +90,8 @@ def _load_jsonl(text: str, name: str) -> EvalData:
 def load(path: str) -> EvalData:
     """Read ``path`` and return canonical EvalData.
 
-    Routing is by extension, with a content fallback: ``.json`` goes through JSON
-    auto-detection, ``.jsonl`` through the line-delimited reader, ``.csv`` through
-    the CSV reader, and anything else is tried as JSON, then JSONL, then CSV.
-    JSONL sits before CSV because a JSON-object line can't be mistaken for a CSV
-    row, and JSON is tried first so a single JSON document is unaffected.
+    Routes by extension (``.json`` / ``.jsonl`` / ``.csv``); anything else is
+    tried as JSON, then JSONL, then CSV.
     """
     p = Path(path)
     if not p.exists():
