@@ -72,6 +72,22 @@ A flat list of rows, one per (example, model). Column names are matched flexibly
 ]
 ```
 
+### JSONL (line-delimited records)
+
+The same records, one JSON object per line — the streaming-friendly shape many
+eval harnesses emit. Point EvalTrust at a `.jsonl` file directly:
+
+```jsonl
+{"id": "q1", "model": "gpt-4", "score": 1}
+{"id": "q1", "model": "claude-3", "score": 0}
+```
+
+Blank lines (and a trailing newline) are ignored. Each line must be a single JSON
+object; a malformed line is reported with its line number rather than skipped
+silently, and a file whose content is actually a JSON array is read as one JSON
+document. A `metric` column fans out into a multi-metric suite exactly as it does
+for CSV and record lists.
+
 ### CSV
 
 Long format — one row per (example, model):

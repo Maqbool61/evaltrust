@@ -9,6 +9,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - `evaltrust --version` prints the installed version and exits.
+- Read line-delimited JSON (`.jsonl`) results — one record per line — through the
+  existing record pipeline, with the same `metric`-column suite handling and
+  skipped-row reporting as CSV. A malformed line fails with its line number.
 
 ## [0.5.0] — 2026-07-08
 

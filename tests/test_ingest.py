@@ -72,6 +72,101 @@ def test_malformed_json_gives_a_friendly_error(tmp_path):
     assert "JSON" in msg
 
 
+# --- JSONL (line-delimited records, issue #17) --------------------------------
+
+
+def test_loads_jsonl_records(tmp_path):
+    text = ('{"id": "q1", "model": "A", "score": 1}\n'
+            '{"id": "q1", "model": "B", "score": 0}\n'
+            '{"id": "q2", "model": "A", "score": 0}\n'
+            '{"id": "q2", "model": "B", "score": 1}\n')
+    data = load(write(tmp_path, "r.jsonl", text))
+    assert data.source_format == "jsonl"
+    assert set(data.models) == {"A", "B"}
+    assert data.n_examples == 2
+
+
+def test_jsonl_tolerates_blank_lines_and_trailing_newline(tmp_path):
+    text = ('\n{"id": "q1", "model": "A", "score": 1}\n\n'
+            '{"id": "q1", "model": "B", "score": 0}\n\n')
+    data = load(write(tmp_path, "r.jsonl", text))
+    assert data.n_examples == 1
+    assert set(data.models) == {"A", "B"}
+
+
+def test_jsonl_malformed_line_names_the_line_number(tmp_path):
+    text = ('{"id": "q1", "model": "A", "score": 1}\n'
+            '{"id": "q1", "model": "B", "score": 0}\n'
+            'this is not json\n')
+    p = write(tmp_path, "bad.jsonl", text)
+    with pytest.raises(ValueError) as exc:
+        load(p)
+    msg = str(exc.value)
+    assert "bad.jsonl" in msg
+    assert "line 3" in msg
+    assert "JSON" in msg
+
+
+def test_jsonl_unreadable_score_is_skipped_and_counted(tmp_path):
+    text = ('{"id": "q1", "model": "A", "score": 1}\n'
+            '{"id": "q1", "model": "B", "score": 0}\n'
+            '{"id": "q2", "model": "A", "score": "banana"}\n'
+            '{"id": "q2", "model": "B", "score": 1}\n')
+    data = load(write(tmp_path, "r.jsonl", text))
+    assert data.metadata["skipped_rows"] == 1
+    assert set(data.models) == {"A", "B"}
+
+
+def test_jsonl_whole_file_json_array_is_handled_as_json(tmp_path):
+    # A JSON array mis-named .jsonl is really a single JSON document; load it
+    # through the normal JSON path rather than treating '[' as a bad record.
+    text = json.dumps([{"id": "q1", "model": "A", "score": 1},
+                       {"id": "q1", "model": "B", "score": 0}])
+    data = load(write(tmp_path, "actually.jsonl", text))
+    assert data.source_format == "generic"
+    assert set(data.models) == {"A", "B"}
+
+
+def test_jsonl_stray_array_line_is_rejected_with_line_number(tmp_path):
+    # Distinct from the whole-file-array case: an array on its own line is not a
+    # record, and must fail loudly rather than be silently dropped.
+    text = ('{"id": "q1", "model": "A", "score": 1}\n'
+            '[1, 2, 3]\n')
+    with pytest.raises(ValueError) as exc:
+        load(write(tmp_path, "mixed.jsonl", text))
+    assert "line 2" in str(exc.value)
+
+
+def test_jsonl_unicode_line_separator_inside_a_value_does_not_split_record(tmp_path):
+    # U+2028 (a Unicode line separator, legal unescaped in a JSON string) must
+    # not be treated as a record boundary; str.splitlines() would split on it.
+    model = "A\u2028B"
+    text = '{"id": "q1", "model": "' + model + '", "score": 1}\n'
+    data = load(write(tmp_path, "u.jsonl", text))
+    assert data.models == [model]
+
+
+def test_empty_jsonl_raises(tmp_path):
+    with pytest.raises(Exception):
+        load(write(tmp_path, "empty.jsonl", "\n  \n"))
+
+
+def test_jsonl_handles_crlf_and_cr_line_endings(tmp_path):
+    body = ['{"id": "q1", "model": "A", "score": 1}',
+            '{"id": "q1", "model": "B", "score": 0}']
+    for name, sep in [("crlf.jsonl", "\r\n"), ("cr.jsonl", "\r")]:
+        data = load(write(tmp_path, name, sep.join(body) + sep))
+        assert set(data.models) == {"A", "B"}, name
+        assert data.n_examples == 1, name
+
+
+def test_json_file_with_unknown_shape_still_raises_unknownformat(tmp_path):
+    # A .json (not .jsonl) file routes only through JSON detection; an
+    # unrecognised object must not silently fall through to the .jsonl reader.
+    with pytest.raises(UnknownFormatError):
+        load(write(tmp_path, "x.json", json.dumps({"a": 1})))
+
+
 # --- two-file comparison (single-system tools) --------------------------------
 
 from evaltrust.core.ingest import load_comparison

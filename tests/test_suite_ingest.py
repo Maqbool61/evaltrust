@@ -89,3 +89,21 @@ def test_load_suite_native_file_is_single_metric(tmp_path):
     p.write_text(json.dumps({"models": ["A", "B"],
                              "examples": [{"id": "q1", "scores": {"A": 1, "B": 0}}]}))
     assert list(load_suite(str(p)).keys()) == ["score"]
+
+
+def test_load_suite_jsonl_with_metric(tmp_path):
+    p = tmp_path / "r.jsonl"
+    p.write_text('{"id": "q1", "model": "A", "metric": "correctness", "score": 1}\n'
+                 '{"id": "q1", "model": "B", "metric": "correctness", "score": 0}\n'
+                 '{"id": "q1", "model": "A", "metric": "safety", "score": 1}\n'
+                 '{"id": "q1", "model": "B", "metric": "safety", "score": 1}\n')
+    suite = load_suite(str(p))
+    assert set(suite.keys()) == {"correctness", "safety"}
+    assert suite["correctness"].source_format == "jsonl"
+
+
+def test_load_suite_jsonl_single_metric_is_one_entry(tmp_path):
+    p = tmp_path / "r.jsonl"
+    p.write_text('{"id": "q1", "model": "A", "score": 1}\n'
+                 '{"id": "q1", "model": "B", "score": 0}\n')
+    assert list(load_suite(str(p)).keys()) == ["score"]
