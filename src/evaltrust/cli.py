@@ -43,6 +43,9 @@ app = typer.Typer(
     add_completion=False,
     help="Check whether an eval's result is real or just noise.")
 _err = Console(stderr=False)  # keep errors on stdout so they're easy to capture
+# Diagnostics that must never mix into machine-readable stdout (e.g. a warning
+# emitted alongside --json output) go here, on real stderr.
+_warn = Console(stderr=True)
 
 
 def _version_callback(value: bool) -> None:
@@ -183,8 +186,9 @@ def audit(
         level = report.verdict.level
     if html_out is not None:
         if suite_report is not None:
-            _err.print("[yellow]--html is not yet supported for multi-metric suites; "
-                       "run a single metric to get an HTML report.[/yellow]")
+            # stderr, not stdout: in --json mode this must not trail the JSON body.
+            _warn.print("[yellow]--html is not yet supported for multi-metric suites; "
+                        "run a single metric to get an HTML report.[/yellow]")
         elif report is not None:
             Path(html_out).write_text(render_html(report, explain=explain), encoding="utf-8")
 
