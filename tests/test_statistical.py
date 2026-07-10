@@ -111,6 +111,30 @@ def test_continuous_effect_size_reports_a_confidence_interval():
     assert "CI" in effect.how_detected
 
 
+def test_ci_percentage_preserves_fractional_confidence_levels():
+    """Prose must show 92.5% for confidence=0.925, not a rounded 92%."""
+    rng = np.random.default_rng(0)
+    a = rng.normal(0.5, 0.2, size=120)
+    b = a + rng.normal(0.4, 0.2, size=120)
+    data = make_data(a, b)
+
+    fractional = audit_statistical_validity(data, "A", "B", seed=0, confidence=0.925)
+    effect_f = by_check(fractional, "effect_size")
+    decision_f = by_check(fractional, "decision")
+    assert "92.5%" in effect_f.how_detected
+    assert "92.5%" in decision_f.how_detected
+    assert "92%" not in effect_f.how_detected.replace("92.5%", "")
+    assert "92%" not in decision_f.how_detected.replace("92.5%", "")
+
+    default = audit_statistical_validity(data, "A", "B", seed=0, confidence=0.95)
+    effect_d = by_check(default, "effect_size")
+    decision_d = by_check(default, "decision")
+    assert "95%" in effect_d.how_detected
+    assert "95%" in decision_d.how_detected
+    assert "95.0%" not in effect_d.how_detected
+    assert "95.0%" not in decision_d.how_detected
+
+
 def test_binary_effect_size_reports_a_risk_difference_interval():
     a, b = [0] * 100, [1] * 80 + [0] * 20
     effect = by_check(

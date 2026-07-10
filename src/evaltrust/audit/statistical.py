@@ -117,7 +117,7 @@ def _discordant_counts(data, leader, trailer) -> tuple[int, int]:
 
 def _decision(outcome, p, alpha, test_name, test_detail, lo, hi, confidence,
               margin, leader, trailer) -> Finding:
-    conf_pct = round(confidence * 100)
+    conf_pct = f"{confidence * 100:g}"
     ci = f"[{lo:+.4f}, {hi:+.4f}]"
     cap = test_name[0].upper() + test_name[1:]  # keep "McNemar" intact
 
@@ -169,7 +169,7 @@ def _fmt_bound(x: float) -> str:
 
 def _effect_size(data, diffs, binary, leader, trailer,
                  confidence=0.95, n_resamples=10_000, seed=0) -> Finding:
-    conf_pct = round(confidence * 100)
+    conf_pct = f"{confidence * 100:g}"
     if binary:
         # Pass rates come from the paired sample (the same examples McNemar and
         # the CI use), so the effect size is computed on the same data as the test.
