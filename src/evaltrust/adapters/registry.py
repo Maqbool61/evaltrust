@@ -13,6 +13,7 @@ from ..core.schema import EvalData
 from .deepeval import DeepEvalAdapter
 from .generic import GenericRecordsAdapter, NativeNestedAdapter
 from .inspect_ai import InspectAdapter
+from .langsmith import LangSmithAdapter
 from .openevals import OpenEvalsAdapter
 from .promptfoo import PromptfooAdapter
 
@@ -36,6 +37,7 @@ REGISTRY: list[Adapter] = [
     DeepEvalAdapter(),
     OpenEvalsAdapter(),
     InspectAdapter(),
+    LangSmithAdapter(),
     NativeNestedAdapter(),
     GenericRecordsAdapter(),
 ]

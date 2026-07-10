@@ -528,3 +528,83 @@ def test_inspect_does_not_false_positive_on_any_existing_fixture():
             assert detected, f.name          # our own fixture must detect
         else:
             assert not detected, f.name      # nothing else may
+
+
+# ---------------------------------------------------------------------------
+# LangSmith run export (one experiment/model per file — paired via two files)
+# ---------------------------------------------------------------------------
+
+from evaltrust.adapters.langsmith import LangSmithAdapter
+
+LANGSMITH = [
+    {"id": "r1", "reference_example_id": "ex1",
+     "feedback_stats": {"correctness": {"n": 1, "avg": 1.0}}},
+    {"id": "r2", "reference_example_id": "ex2",
+     "feedback_stats": {"correctness": {"n": 1, "avg": 0.0},
+                        "conciseness": {"n": 1, "avg": 0.5}}},
+]
+
+
+def test_langsmith_detects_and_parses_averaging_multiple_metrics():
+    a = LangSmithAdapter()
+    assert a.detect(LANGSMITH)
+    data = a.parse(LANGSMITH)
+    assert data.n_examples == 2
+    (model,) = data.models
+    assert data.examples[0].scores[model] == 1.0
+    assert data.examples[1].scores[model] == 0.25   # mean(0.0, 0.5)
+
+
+def test_langsmith_skips_runs_without_a_reference_example_id():
+    raw = LANGSMITH + [{"id": "r3", "reference_example_id": None, "feedback_stats": {}}]
+    data = LangSmithAdapter().parse(raw)
+    assert data.n_examples == 2
+
+
+def test_langsmith_raises_when_no_run_has_a_reference_example_id():
+    raw = [{"id": "r1", "reference_example_id": None, "feedback_stats": {}}]
+    with pytest.raises(ValueError):
+        LangSmithAdapter().parse(raw)
+
+
+def test_langsmith_skips_and_counts_a_run_with_no_usable_avg():
+    # A run with a reference_example_id but empty/unusable feedback_stats must
+    # not sink the whole export -- skip it and count it, like the CSV/generic/
+    # Inspect/OpenEvals adapters already do for a single bad row.
+    raw = LANGSMITH + [
+        {"id": "r3", "reference_example_id": "ex3", "feedback_stats": {}},
+        {"id": "r4", "reference_example_id": "ex4",
+         "feedback_stats": {"correctness": {"n": 0, "avg": None}}},
+    ]
+    data = LangSmithAdapter().parse(raw)
+    assert data.n_examples == 2                  # ex1, ex2 only
+    assert data.metadata["skipped_rows"] == 2     # ex3, ex4 counted, not dropped silently
+
+
+def test_langsmith_raises_when_every_run_has_no_usable_avg():
+    raw = [
+        {"id": "r1", "reference_example_id": "ex1", "feedback_stats": {}},
+        {"id": "r2", "reference_example_id": "ex2",
+         "feedback_stats": {"correctness": {"n": 0, "avg": None}}},
+    ]
+    with pytest.raises(ValueError):
+        LangSmithAdapter().parse(raw)
+
+
+def test_langsmith_does_not_false_positive_on_other_fixtures():
+    a = LangSmithAdapter()
+    for other in (PROMPTFOO, NATIVE, LONG, WIDE, DEEPEVAL_SNAKE, DEEPEVAL_CAMEL,
+                  OPENEVALS_SAMPLE, INSPECT):
+        assert not a.detect(other), other
+
+
+def test_no_earlier_adapter_claims_a_langsmith_export():
+    assert not PromptfooAdapter().detect(LANGSMITH)
+    assert not DeepEvalAdapter().detect(LANGSMITH)
+    assert not OpenEvalsAdapter().detect(LANGSMITH)
+    assert not InspectAdapter().detect(LANGSMITH)
+    assert not NativeNestedAdapter().detect(LANGSMITH)
+
+
+def test_detect_routes_langsmith():
+    assert detect_adapter(LANGSMITH).source_format == "langsmith"

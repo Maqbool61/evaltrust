@@ -261,13 +261,14 @@ produced and auto-detects the shape. First-class adapters today:
 
 - **Promptfoo** results (several providers compared across test cases)
 - **DeepEval** test-results export (one model per run - pass two files to compare)
+- **LangSmith** run export (one experiment per run - pass two files to compare)
 - **Nested JSON** - `{"models": [...], "examples": [{"id", "scores": {...}}]}`
 - **Record lists** - JSON like `[{"id", "model", "score"}, ...]`
 - **CSV** - long (`id,model,score`) or wide (`id,gpt,claude`)
 
-Tools without a dedicated adapter yet (LangSmith, OpenEvals, and others) work by
-exporting to CSV or a record list - usually a one-liner. More native adapters are
-a top roadmap item; [contributing one](docs/adapters.md) is straightforward.
+Tools without a dedicated adapter yet work by exporting to CSV or a record
+list - usually a one-liner. More native adapters are a top roadmap item;
+[contributing one](docs/adapters.md) is straightforward.
 Details and single-model pairing in [`docs/input-formats.md`](docs/input-formats.md).
 
 ## How it works
