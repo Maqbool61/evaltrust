@@ -19,6 +19,14 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `0.8`, so output is unchanged until you set them apart.
 
 ### Fixed
+- **Judge consensus no longer nan-compares when a judge scored only one model.**
+  `_consensus()` called `np.mean([])` → `nan` when a judge had results for only
+  one of the two models; `nan >= nan` is `False`, silently defaulting the winner
+  to `model_a`. Judges missing scores for either model are now skipped and listed
+  in the finding's `how_detected` and `details.skipped_judges`. When all judges
+  are skipped the finding returns `Status.SKIP` instead of a spurious disagree.
+  When only one judge survives the skip the finding also returns `Status.SKIP`
+  (one judge is not consensus). Fixes #53.
 
 - **Saturation check no longer false-warns on continuous or rubric scales.**
   `_saturation()` previously divided the top model mean by the highest *observed*

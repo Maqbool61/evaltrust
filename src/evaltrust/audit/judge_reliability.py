@@ -63,13 +63,50 @@ def audit_judge_reliability(
 
 
 def _consensus(data, judges, model_a, model_b) -> Finding:
-    winners = {}
+    winners: dict[str, str] = {}
+    skipped_judges: list[str] = []
     for j in judges:
         a_vals = [ex.judges[j][model_a] for ex in data.examples
                   if ex.judges and j in ex.judges and model_a in ex.judges[j]]
         b_vals = [ex.judges[j][model_b] for ex in data.examples
                   if ex.judges and j in ex.judges and model_b in ex.judges[j]]
+        if not a_vals or not b_vals:
+            skipped_judges.append(j)
+            continue
         winners[j] = model_b if np.mean(b_vals) >= np.mean(a_vals) else model_a
+    if not winners:
+        return Finding(
+            pillar=PILLAR,
+            title="No judges scored both models",
+            status=Status.SKIP,
+            why=(
+                "Every judge scored only one of the two models, so no "
+                "meaningful consensus can be computed."
+            ),
+            how_detected="All judges skipped: " + ", ".join(skipped_judges) + ".",
+            how_to_fix="Ensure every judge scores both models on the same examples.",
+            details={"check": "judge_consensus", "per_judge_winner": {},
+                     "unanimous": False, "skipped_judges": skipped_judges},
+        )
+    if len(winners) < 2:
+        sole = next(iter(winners.keys()))
+        return Finding(
+            pillar=PILLAR,
+            title="Only one judge scored both models — consensus not assessable",
+            status=Status.SKIP,
+            why=(
+                "A single judge's verdict could be its own bias. Consensus "
+                "requires at least two judges that each scored both models."
+            ),
+            how_detected=(
+                f"{sole} was the only judge with scores for both models"
+                + ("; skipped: " + ", ".join(skipped_judges) if skipped_judges else "")
+                + "."
+            ),
+            how_to_fix="Add a second judge that scores both models.",
+            details={"check": "judge_consensus", "per_judge_winner": dict(winners),
+                     "unanimous": False, "skipped_judges": skipped_judges},
+        )
 
     unique = set(winners.values())
     unanimous = len(unique) == 1
@@ -86,7 +123,7 @@ def _consensus(data, judges, model_a, model_b) -> Finding:
         ),
         how_detected=(
             f"Each judge's preferred model: "
-            + ", ".join(f"{j}->{winners[j]}" for j in judges) + "."
+            + ", ".join(f"{j}->{winners[j]}" for j in winners) + (" (skipped — missing scores for at least one model: " + ", ".join(skipped_judges) + ")" if skipped_judges else "") + "."
         ),
         how_to_fix=(
             f"Every judge preferred {winner}; the verdict is judge-independent."
@@ -95,7 +132,7 @@ def _consensus(data, judges, model_a, model_b) -> Finding:
             "reconcile them first."
         ),
         details={"check": "judge_consensus", "per_judge_winner": winners,
-                 "unanimous": unanimous},
+                 "unanimous": unanimous, "skipped_judges": skipped_judges},
     )
 
 
