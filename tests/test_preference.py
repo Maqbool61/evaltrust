@@ -10,7 +10,13 @@ import numpy as np
 import pytest
 from scipy.stats import binomtest
 
-from evaltrust.adapters.common import DEFAULT_PREFERENCE_JUDGE, coerce_score
+from evaltrust.adapters.common import (
+    DEFAULT_PREFERENCE_JUDGE,
+    PreferenceRecord,
+    Record,
+    coerce_score,
+    records_to_evaldata,
+)
 from evaltrust.audit.preference import audit_preferences
 from evaltrust.audit.runner import run_audit
 from evaltrust.audit.suite import audit_suite
@@ -30,7 +36,7 @@ def _data(votes, models=("A", "B"), scores=None):
         models=list(models),
         examples=[
             Example(id=str(i), scores=score, preferences=preference)
-            for i, (score, preference) in enumerate(zip(scores, votes))
+            for i, (score, preference) in enumerate(zip(scores, votes, strict=True))
         ],
         source_format="test",
     )
@@ -38,6 +44,11 @@ def _data(votes, models=("A", "B"), scores=None):
 
 def _finding(findings, check):
     return next(f for f in findings if f.details.get("check") == check)
+
+
+def test_data_helper_rejects_mismatched_scores_and_votes():
+    with pytest.raises(ValueError, match=r"zip\(\) argument 2 is longer"):
+        _data([{"judge": "A"}, {"judge": "B"}], scores=[{}])
 
 
 def test_schema_reports_preference_evidence():
@@ -337,6 +348,36 @@ def test_unscored_preference_winner_is_kept_as_a_model(tmp_path):
     assert data.examples[0].preferences == {DEFAULT_PREFERENCE_JUDGE: "B"}
 
 
+def test_unknown_winner_is_rejected_when_preference_records_declare_models():
+    records = [PreferenceRecord("q1", "AA", models=("A", "B"))]
+    with pytest.raises(
+        ValueError,
+        match=r"unknown preference winner 'AA'.*known models.*'A'.*'B'",
+    ):
+        records_to_evaldata(records, "test")
+
+
+def test_unknown_winner_is_rejected_when_scores_establish_models():
+    records = [
+        PreferenceRecord("q1", "AA"),
+        Record("q1", "A", 1.0),
+        Record("q1", "B", 0.0),
+    ]
+    with pytest.raises(
+        ValueError,
+        match=r"unknown preference winner 'AA'.*known models.*'A'.*'B'",
+    ):
+        records_to_evaldata(records, "test")
+
+
+def test_preference_winners_declare_models_when_no_other_declaration_exists():
+    data = records_to_evaldata(
+        [PreferenceRecord("q1", "A"), PreferenceRecord("q2", "B")],
+        "test",
+    )
+    assert data.models == ["A", "B"]
+
+
 def test_empty_metadata_column_is_not_inferred_as_a_model(tmp_path):
     path = tmp_path / "preference-only.csv"
     path.write_text(
@@ -387,3 +428,41 @@ def test_two_file_pairing_rejects_preferences_instead_of_dropping_them():
     )
     with pytest.raises(ValueError, match="one file"):
         merge_two(left, right, "A", "B")
+
+
+def test_native_nested_json_preserves_preferences(tmp_path):
+    path = tmp_path / "native-preferences.json"
+    path.write_text(json.dumps({
+        "models": ["A", "B"],
+        "examples": [
+            {
+                "id": "q1",
+                "scores": {"A": 1.0, "B": 0.0},
+                "preferences": {"human": "A"},
+            },
+            {
+                "id": "q2",
+                "scores": {"A": 0.5, "B": 0.5},
+                "preferences": {"human": "tie"},
+            },
+        ],
+    }))
+    data = load(str(path))
+    assert data.source_format == "native"
+    assert data.examples[0].preferences == {"human": "A"}
+    assert data.examples[1].preferences == {"human": Preference.TIE}
+
+
+def test_native_nested_json_uses_global_scores_to_reject_unknown_winner(tmp_path):
+    path = tmp_path / "native-unknown-winner.json"
+    path.write_text(json.dumps({
+        "examples": [
+            {"id": "q1", "scores": {"A": 1.0, "B": 0.0}},
+            {"id": "q2", "scores": {}, "preferences": {"human": "AA"}},
+        ],
+    }))
+    with pytest.raises(
+        ValueError,
+        match=r"unknown preference winner 'AA'.*known models.*'A'.*'B'",
+    ):
+        load(str(path))

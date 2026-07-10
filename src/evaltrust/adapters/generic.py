@@ -70,6 +70,11 @@ def _coerce_preference(
                 )
             return Preference.TIE
         if value:
+            if declared_models and value not in declared_models:
+                raise ValueError(
+                    f"unknown preference winner {value!r}; known models are "
+                    f"{list(declared_models)!r}"
+                )
             return value
     raise ValueError(f"Cannot interpret {raw!r} as a pairwise preference")
 
@@ -99,7 +104,7 @@ def _is_preference_column(rows, key) -> bool:
     return True
 
 
-def _known_models(rows, model_key, columns) -> tuple[str, ...]:
+def _known_models(rows, model_key, columns, preference_key=None) -> tuple[str, ...]:
     """Return explicit long-format models or wide columns with actual scores."""
     if model_key:
         models = []
@@ -110,8 +115,21 @@ def _known_models(rows, model_key, columns) -> tuple[str, ...]:
         if models:
             return tuple(models)
 
+    preference_models = set()
+    if preference_key:
+        for row in rows:
+            value = row.get(preference_key)
+            if (
+                isinstance(value, str)
+                and value.strip()
+                and value.strip().casefold() != Preference.TIE.value
+            ):
+                preference_models.add(value.strip())
     models = []
     for column in columns:
+        if str(column) in preference_models:
+            models.append(str(column))
+            continue
         for row in rows:
             try:
                 coerce_score(row.get(column))
@@ -151,7 +169,8 @@ def dicts_to_records(
         reserved.add(preference_key)
     wide_columns = [column for column in keys if column not in reserved]
     declared_models = (
-        _known_models(rows, model_key, wide_columns) if preference_key else ()
+        _known_models(rows, model_key, wide_columns, preference_key)
+        if preference_key else ()
     )
 
     records: list[Record | PreferenceRecord] = []
@@ -263,6 +282,12 @@ class NativeNestedAdapter:
         examples = []
         models: list[str] = []
         skipped = 0
+        declared_models = tuple(str(model) for model in (raw.get("models") or ()))
+        scored_models = tuple(dict.fromkeys(
+            str(model)
+            for example in raw["examples"]
+            for model in example["scores"]
+        ))
         for i, ex in enumerate(raw["examples"]):
             scores = {}
             for m, s in ex["scores"].items():
@@ -275,8 +300,19 @@ class NativeNestedAdapter:
                     models.append(m)
             runs = _coerce_runs(ex.get("runs"))
             judges = _coerce_judges(ex.get("judges"))
+            preferences = ex.get("preferences")
+            if preferences is not None and not isinstance(preferences, dict):
+                raise ValueError(
+                    "Native example preferences must be a judge-to-winner map"
+                )
+            known_models = declared_models or scored_models
+            preferences = ({
+                str(judge): _coerce_preference(winner, known_models)
+                for judge, winner in preferences.items()
+            } if preferences else None)
             examples.append(Example(id=str(ex.get("id", i)), scores=scores,
-                                    runs=runs, judges=judges))
+                                    runs=runs, judges=judges,
+                                    preferences=preferences))
 
         if raw.get("models"):
             models = [str(m) for m in raw["models"]]

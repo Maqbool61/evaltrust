@@ -98,10 +98,23 @@ def records_to_evaldata(
     grouped: OrderedDict[str, OrderedDict[str, dict]] = OrderedDict()
     preferences: OrderedDict[str, OrderedDict[str, str | Preference]] = OrderedDict()
     model_order: list[str] = []
+    scored_models = tuple(dict.fromkeys(
+        rec.model for rec in records if isinstance(rec, Record)
+    ))
 
     for rec in records:
         models = grouped.setdefault(rec.example_id, OrderedDict())
         if isinstance(rec, PreferenceRecord):
+            known_models = tuple(dict.fromkeys((*rec.models, *scored_models)))
+            if (
+                isinstance(rec.preference, str)
+                and known_models
+                and rec.preference not in known_models
+            ):
+                raise ValueError(
+                    f"unknown preference winner {rec.preference!r} for example "
+                    f"{rec.example_id!r}; known models are {list(known_models)!r}"
+                )
             per_judge = preferences.setdefault(rec.example_id, OrderedDict())
             per_judge[rec.judge] = rec.preference
             for model in rec.models:
@@ -165,7 +178,7 @@ def records_to_suite(
     if not records:
         raise ValueError("No records found to build an evaluation from")
 
-    by_metric: "OrderedDict[str, list[Record]]" = OrderedDict()
+    by_metric: "OrderedDict[str, list[Record | PreferenceRecord]]" = OrderedDict()
     for rec in records:
         by_metric.setdefault(rec.metric, []).append(rec)
 

@@ -265,8 +265,8 @@ def _score_skip(pillar, check, detected, fix, reason) -> Finding:
         title="Not assessed",
         status=Status.SKIP,
         why=(
-            "This score-based check needs evidence that pairwise preferences do not "
-            "contain."
+            "This score-based check needs paired per-model scores, which "
+            "preference-only data does not provide."
         ),
         how_detected=detected,
         how_to_fix=fix,
