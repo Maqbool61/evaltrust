@@ -1,18 +1,8 @@
 """LangSmith adapter.
 
-LangSmith evaluates one experiment (one model/variant) per run export, so a
-single export contains one model — you compare two experiments with
-``evaltrust audit expA.json expB.json``. This adapter reads a LangSmith run
-list (one dict per run, as returned by ``Client.list_runs`` or the runs query
-API): each run is grouped by ``reference_example_id`` and scored from its
-``feedback_stats``.
-
-Per run the score is the mean across whatever feedback metrics are present —
-LangSmith has no single dominant pass/fail field the way DeepEval has
-``success``. Runs with no ``reference_example_id`` (not part of the evaluated
-dataset) are skipped. The raw schema carries no experiment/session name, so
-the model is left generic; the file name supplies the label when pairing two
-runs.
+Reads a LangSmith run list (one experiment/model per export, grouped by
+``reference_example_id``); the score per run is the mean of its
+``feedback_stats`` metrics.
 """
 
 from __future__ import annotations

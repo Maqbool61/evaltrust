@@ -129,10 +129,84 @@ def test_continuous_threshold_is_a_correlation_floor_not_an_agreement_rate():
     pairs = [(5, 1, 1, 2), (4, 2, 3, 1), (3, 3, 2, 5), (2, 4, 4, 3), (1, 5, 5, 4)]
     data = _continuous(pairs)
     rho = by_check(audit_judge_calibration(data, "A", "B"))[0].details["correlations"]["gpt"]
-    strict = by_check(audit_judge_calibration(data, "A", "B", threshold=rho + 0.05))[0]
-    loose = by_check(audit_judge_calibration(data, "A", "B", threshold=rho - 0.05))[0]
+    # The correlation path is governed by `correlation_threshold` (a rho floor).
+    strict = by_check(
+        audit_judge_calibration(data, "A", "B", correlation_threshold=rho + 0.05))[0]
+    loose = by_check(
+        audit_judge_calibration(data, "A", "B", correlation_threshold=rho - 0.05))[0]
     assert strict.status is Status.WARN
     assert loose.status is Status.PASS
+
+
+def test_agreement_and_correlation_thresholds_are_independent_across_paths():
+    # A fraction-agreed floor and a rank-correlation floor are different bars, so
+    # they must move the two paths independently. Binary judge (agreement 0.75):
+    # only `threshold` moves it; `correlation_threshold` is inert.
+    ex = []
+    for i in range(20):
+        gold = {"A": 1, "B": 0}
+        gpt = gold if i % 4 != 0 else {"A": 0, "B": 1}    # agrees 75% of the time
+        ex.append({"gold": gold, "gpt": gpt})
+    binary = make(ex)
+    assert by_check(audit_judge_calibration(binary, "A", "B", threshold=0.7,
+                    correlation_threshold=0.99))[0].status is Status.PASS
+    assert by_check(audit_judge_calibration(binary, "A", "B", threshold=0.8,
+                    correlation_threshold=0.01))[0].status is Status.WARN
+
+    # Continuous judge: only `correlation_threshold` moves it; `threshold` (the
+    # agreement floor) is inert on this path. The floor is set relative to the
+    # scipy reference rho, not the audit's own number.
+    pairs = [(5, 1, 1, 2), (4, 2, 3, 1), (3, 3, 2, 5), (2, 4, 4, 3), (1, 5, 5, 4)]
+    cont = _continuous(pairs)
+    rho = _expected_rho(pairs)              # scipy.stats.spearmanr reference
+    assert by_check(audit_judge_calibration(cont, "A", "B", threshold=0.99,
+                    correlation_threshold=rho - 0.05))[0].status is Status.PASS
+    assert by_check(audit_judge_calibration(cont, "A", "B", threshold=0.01,
+                    correlation_threshold=rho + 0.05))[0].status is Status.WARN
+
+
+def test_threshold_still_governs_correlation_when_correlation_threshold_is_unset():
+    # Backwards compatibility: before the split, one `threshold` governed BOTH
+    # paths. A caller that passes only `threshold` on continuous data must still
+    # get it as the rho floor (correlation_threshold defaults to "fall back to
+    # threshold"), so no existing caller silently changes behaviour. Floor is set
+    # against the scipy reference rho.
+    pairs = [(5, 1, 1, 2), (4, 2, 3, 1), (3, 3, 2, 5), (2, 4, 4, 3), (1, 5, 5, 4)]
+    data = _continuous(pairs)
+    rho = _expected_rho(pairs)
+    assert by_check(
+        audit_judge_calibration(data, "A", "B", threshold=rho + 0.05))[0].status is Status.WARN
+    assert by_check(
+        audit_judge_calibration(data, "A", "B", threshold=rho - 0.05))[0].status is Status.PASS
+
+
+def test_defaults_keep_both_floors_at_0_8_so_output_is_unchanged():
+    # With correlation_threshold unset it falls back to threshold (default 0.8) —
+    # exactly the single-knob behaviour main used — so the default call is
+    # byte-identical to passing 0.8, and a continuous judge is still judged at
+    # rho >= 0.8 (main's number, from scipy).
+    pairs = [(5, 1, 1, 2), (4, 2, 3, 1), (3, 3, 2, 5), (2, 4, 4, 3), (1, 5, 5, 4)]
+    cont = _continuous(pairs)
+    default = by_check(audit_judge_calibration(cont, "A", "B"))[0]
+    explicit = by_check(audit_judge_calibration(cont, "A", "B", threshold=0.8))[0]
+    assert default.to_dict() == explicit.to_dict()
+    assert (default.status is Status.PASS) == (_expected_rho(pairs) >= 0.8)
+
+
+def test_config_correlation_threshold_flows_through_run_audit():
+    # End-to-end: the config's judge_correlation_threshold reaches the calibration
+    # check through run_audit -> _comparison. Floor set against the scipy rho.
+    from evaltrust.audit.runner import run_audit
+    from evaltrust.config import AuditConfig
+    pairs = [(5, 1, 1, 2), (4, 2, 3, 1), (3, 3, 2, 5), (2, 4, 4, 3), (1, 5, 5, 4)]
+    data = _continuous(pairs)
+    rho = _expected_rho(pairs)
+    strict = run_audit(data, model_a="A", model_b="B",
+                       config=AuditConfig(judge_correlation_threshold=rho + 0.05))
+    loose = run_audit(data, model_a="A", model_b="B",
+                      config=AuditConfig(judge_correlation_threshold=rho - 0.05))
+    assert by_check(strict.findings)[0].status is Status.WARN
+    assert by_check(loose.findings)[0].status is Status.PASS
 
 
 # --- edge cases that must not regress the original / must degrade gracefully ---

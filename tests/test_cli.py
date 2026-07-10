@@ -304,3 +304,15 @@ def test_md_output_contains_verdict_and_finding_titles(tmp_path):
     assert "# EvalTrust" in result.stdout
     assert "High Confidence" in result.stdout or "high confidence" in result.stdout.lower()
     assert "**[" in result.stdout
+
+
+def test_suite_json_with_html_keeps_stdout_pure_json(tmp_path):
+    # HTML isn't supported for multi-metric suites, so the CLI warns -- but that
+    # warning must not land on stdout after the JSON body, or it corrupts the
+    # machine-readable output. In --json mode stdout must stay pure JSON.
+    out = tmp_path / "out.html"
+    result = runner.invoke(
+        app, ["audit", multi_metric_file(tmp_path), "--json", "--html", str(out)])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)   # must parse cleanly, no trailing warning
+    assert "metrics" in payload

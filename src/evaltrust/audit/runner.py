@@ -82,6 +82,28 @@ def _data_quality(data: EvalData) -> Finding | None:
     )
 
 
+def _pairing_coverage(data: EvalData) -> Finding | None:
+    """Flag examples dropped while pairing two single-model files."""
+    unmatched = int(data.metadata.get("unmatched_examples", 0))
+    if unmatched <= 0:
+        return None
+    kept = data.n_examples
+    return Finding(
+        pillar="Data Quality",
+        title=f"{unmatched} examples dropped during pairing",
+        status=Status.WARN,
+        why=("Only examples present in both files are compared. If the overlap "
+             "isn't random — one run stopped early, or covers different cases — "
+             "the audit compares the models on a biased slice."),
+        how_detected=(f"Paired {kept} shared examples; {unmatched} appeared in "
+                      "only one file (or lacked a score) and were dropped."),
+        how_to_fix=("Re-run both evaluations on the same example set, or check "
+                    "that ids match between the files."),
+        details={"check": "pairing_coverage", "unmatched_examples": unmatched,
+                 "kept": kept},
+    )
+
+
 def _pick_models(data: EvalData) -> tuple[str, str]:
     """Compare the two strongest models by mean score (stable, documented)."""
     if len(data.models) < 2:
@@ -102,16 +124,13 @@ def run_audit(
     *,
     significant: bool | None = None,
 ) -> AuditReport:
-    # A config bundles every threshold; when not given, build one from the loose
-    # kwargs so existing callers keep working unchanged.
+    # When no config is given, build one from the loose kwargs.
     cfg = config or AuditConfig(alpha=alpha, equivalence_margin=equivalence_margin,
                                 seed=seed)
 
-    # `significant` lets a multiplicity procedure own a two-model comparison's
-    # significance decision (see audit_statistical_validity). It is a per-run
-    # override, not team policy, so it lives here and never in AuditConfig; it
-    # applies only to the comparison path (single-model audits ignore it).
-    # Dispatch: two models -> comparison; a threshold or a lone model -> single.
+    # `significant` is a per-run override for the comparison path (used by Holm);
+    # single-model audits ignore it. Dispatch: two models -> comparison; a
+    # threshold or a lone model -> single.
     if model_a is not None and model_b is not None:
         return _comparison(data, model_a, model_b, cfg, significant=significant)
     if threshold is not None:
@@ -135,9 +154,9 @@ def _comparison(data, model_a, model_b, cfg, significant=None) -> AuditReport:
             "there's nothing to compare. Check the models and score columns.")
 
     findings: list[Finding] = []
-    dq = _data_quality(data)
-    if dq is not None:
-        findings.append(dq)
+    for quality in (_data_quality(data), _pairing_coverage(data)):
+        if quality is not None:
+            findings.append(quality)
     findings += audit_statistical_validity(
         data, model_a, model_b, alpha=cfg.alpha,
         equivalence_margin=cfg.equivalence_margin, power_target=cfg.power_target,
@@ -153,6 +172,7 @@ def _comparison(data, model_a, model_b, cfg, significant=None) -> AuditReport:
     findings += audit_judge_calibration(
         data, model_a, model_b,
         threshold=cfg.judge_agreement_threshold,
+        correlation_threshold=cfg.judge_correlation_threshold,
         reference_judge=cfg.reference_judge)
 
     return AuditReport(
