@@ -24,6 +24,44 @@ _LM_EVAL_FIXTURE = (
     / "fixtures"
     / "samples_arc_challenge_2026-07-09T22-44-17.123456.jsonl"
 )
+# Sibling results file for the samples fixture. Top-level model_name /
+# model_name_sanitized / model_source come from GeneralConfigTracker via
+# save_results_aggregated at EleutherAI/lm-evaluation-harness@97a5e2c.
+_LM_EVAL_RESULTS_FIXTURE = (
+    _TESTS_DIR
+    / "fixtures"
+    / "results_2026-07-09T22-44-17.123456.json"
+)
+_LM_EVAL_MODEL = "EleutherAI/pythia-160m"
+
+
+def _sample_row(doc_id: int = 0, acc: float = 1.0) -> dict:
+    return {
+        "doc_id": doc_id,
+        "resps": [["A"]],
+        "metrics": ["acc"],
+        "acc": acc,
+    }
+
+
+def _write_samples(directory: Path, name: str, rows: list[dict] | None = None) -> Path:
+    path = directory / name
+    payload = rows if rows is not None else [_sample_row()]
+    path.write_text("".join(json.dumps(row) + "\n" for row in payload))
+    return path
+
+
+def _write_results(
+    directory: Path, name: str, model_name: object = _LM_EVAL_MODEL
+) -> Path:
+    path = directory / name
+    path.write_text(json.dumps({
+        "task_hashes": {},
+        "model_source": "hf",
+        "model_name": model_name,
+        "model_name_sanitized": "EleutherAI__pythia-160m",
+    }))
+    return path
 
 
 def _rows(path: Path) -> list[dict]:
@@ -140,8 +178,12 @@ def test_lm_eval_fixture_detects_and_parses_source_derived_shape():
     assert len(records) == 4
     assert {record.metric for record in records} == {"acc", "acc_norm"}
     assert {record.example_id for record in records} == {"0", "1"}
-    assert {record.model for record in records} == {"arc_challenge"}
-    assert metadata == {"skipped_rows": 0, "model_name_inferred": True}
+    assert {record.model for record in records} == {_LM_EVAL_MODEL}
+    assert metadata == {
+        "skipped_rows": 0,
+        "model_name_inferred": False,
+        "model_name_source": _LM_EVAL_RESULTS_FIXTURE.name,
+    }
 
 
 def test_lm_eval_multi_metric_fixture_fans_into_suite():
@@ -149,9 +191,13 @@ def test_lm_eval_multi_metric_fixture_fans_into_suite():
 
     assert list(suite) == ["acc", "acc_norm"]
     assert all(data.source_format == "lm-eval" for data in suite.values())
-    assert all(data.models == ["arc_challenge"] for data in suite.values())
-    assert all(data.metadata["model_name_inferred"] for data in suite.values())
-    assert [example.scores["arc_challenge"] for example in suite["acc"].examples] == [
+    assert all(data.models == [_LM_EVAL_MODEL] for data in suite.values())
+    assert all(data.metadata["model_name_inferred"] is False for data in suite.values())
+    assert all(
+        data.metadata["model_name_source"] == _LM_EVAL_RESULTS_FIXTURE.name
+        for data in suite.values()
+    )
+    assert [example.scores[_LM_EVAL_MODEL] for example in suite["acc"].examples] == [
         1.0,
         1.0,
     ]
@@ -161,11 +207,143 @@ def test_lm_eval_load_keeps_existing_multi_metric_load_semantics():
     data = load(str(_LM_EVAL_FIXTURE))
 
     assert data.source_format == "lm-eval"
-    assert data.examples[0].runs == {"arc_challenge": [1.0, 0.75]}
-    assert data.examples[0].scores == {"arc_challenge": 0.875}
+    assert data.examples[0].runs == {_LM_EVAL_MODEL: [1.0, 0.75]}
+    assert data.examples[0].scores == {_LM_EVAL_MODEL: 0.875}
 
 
-def test_lm_eval_counts_each_unreadable_metric_value():
+def test_lm_eval_sibling_matching_timestamp_uses_results_model_name(tmp_path):
+    samples = _write_samples(
+        tmp_path, "samples_arc_challenge_2026-07-09T22-44-17.123456.jsonl"
+    )
+    _write_results(tmp_path, "results_2026-07-09T22-44-17.123456.json")
+
+    records, metadata = LMEvalAdapter().parse_lines(_rows(samples), path=samples)
+
+    assert {record.model for record in records} == {_LM_EVAL_MODEL}
+    assert metadata == {
+        "skipped_rows": 0,
+        "model_name_inferred": False,
+        "model_name_source": "results_2026-07-09T22-44-17.123456.json",
+    }
+
+
+def test_lm_eval_no_sibling_falls_back_to_filename_inference(tmp_path):
+    samples = _write_samples(
+        tmp_path, "samples_arc_challenge_2026-07-09T22-44-17.123456.jsonl"
+    )
+
+    records, metadata = LMEvalAdapter().parse_lines(_rows(samples), path=samples)
+
+    assert {record.model for record in records} == {"arc_challenge"}
+    assert metadata == {"skipped_rows": 0, "model_name_inferred": True}
+    assert "model_name_source" not in metadata
+
+
+def test_lm_eval_single_nonmatching_timestamp_sibling_is_used(tmp_path):
+    samples = _write_samples(
+        tmp_path, "samples_arc_challenge_2026-07-09T22-44-17.123456.jsonl"
+    )
+    _write_results(tmp_path, "results_2020-01-01T00-00-00.000000.json")
+
+    records, metadata = LMEvalAdapter().parse_lines(_rows(samples), path=samples)
+
+    assert {record.model for record in records} == {_LM_EVAL_MODEL}
+    assert metadata == {
+        "skipped_rows": 0,
+        "model_name_inferred": False,
+        "model_name_source": "results_2020-01-01T00-00-00.000000.json",
+    }
+
+
+def test_lm_eval_multiple_siblings_no_timestamp_match_falls_back(tmp_path):
+    samples = _write_samples(
+        tmp_path, "samples_arc_challenge_2026-07-09T22-44-17.123456.jsonl"
+    )
+    _write_results(tmp_path, "results_2020-01-01T00-00-00.000000.json", "model-a")
+    _write_results(tmp_path, "results_2021-01-01T00-00-00.000000.json", "model-b")
+
+    records, metadata = LMEvalAdapter().parse_lines(_rows(samples), path=samples)
+
+    assert {record.model for record in records} == {"arc_challenge"}
+    assert metadata == {"skipped_rows": 0, "model_name_inferred": True}
+    assert "model_name_source" not in metadata
+
+
+def test_lm_eval_timestamp_match_wins_regardless_of_sort_order(tmp_path):
+    samples = _write_samples(
+        tmp_path, "samples_arc_challenge_2026-07-09T22-44-17.123456.jsonl"
+    )
+    # Lexicographically earlier and later non-matches sandwich the match.
+    _write_results(tmp_path, "results_2019-01-01T00-00-00.000000.json", "model-early")
+    _write_results(
+        tmp_path, "results_2026-07-09T22-44-17.123456.json", "model-matched"
+    )
+    _write_results(tmp_path, "results_2029-01-01T00-00-00.000000.json", "model-late")
+
+    records, metadata = LMEvalAdapter().parse_lines(_rows(samples), path=samples)
+
+    assert {record.model for record in records} == {"model-matched"}
+    assert metadata == {
+        "skipped_rows": 0,
+        "model_name_inferred": False,
+        "model_name_source": "results_2026-07-09T22-44-17.123456.json",
+    }
+
+
+def test_lm_eval_malformed_results_json_falls_back(tmp_path):
+    samples = _write_samples(
+        tmp_path, "samples_arc_challenge_2026-07-09T22-44-17.123456.jsonl"
+    )
+    (tmp_path / "results_2026-07-09T22-44-17.123456.json").write_text("{not json")
+
+    records, metadata = LMEvalAdapter().parse_lines(_rows(samples), path=samples)
+
+    assert {record.model for record in records} == {"arc_challenge"}
+    assert metadata == {"skipped_rows": 0, "model_name_inferred": True}
+
+
+@pytest.mark.parametrize("model_name", [None, "", 42, ["x"]])
+def test_lm_eval_invalid_model_name_in_results_falls_back(tmp_path, model_name):
+    samples = _write_samples(
+        tmp_path, "samples_arc_challenge_2026-07-09T22-44-17.123456.jsonl"
+    )
+    _write_results(
+        tmp_path, "results_2026-07-09T22-44-17.123456.json", model_name=model_name
+    )
+
+    records, metadata = LMEvalAdapter().parse_lines(_rows(samples), path=samples)
+
+    assert {record.model for record in records} == {"arc_challenge"}
+    assert metadata == {"skipped_rows": 0, "model_name_inferred": True}
+
+
+def test_lm_eval_path_none_falls_back_to_inference():
+    rows = [_sample_row()]
+
+    records, metadata = LMEvalAdapter().parse_lines(rows, path=None)
+
+    assert {record.model for record in records} == {"model"}
+    assert metadata == {"skipped_rows": 0, "model_name_inferred": True}
+    assert "model_name_source" not in metadata
+
+
+def test_lm_eval_results_lookup_is_deterministic_with_multiple_siblings(tmp_path):
+    samples = _write_samples(
+        tmp_path, "samples_arc_challenge_2026-07-09T22-44-17.123456.jsonl"
+    )
+    _write_results(tmp_path, "results_2019-01-01T00-00-00.000000.json", "model-a")
+    _write_results(
+        tmp_path, "results_2026-07-09T22-44-17.123456.json", "model-matched"
+    )
+    _write_results(tmp_path, "results_2029-01-01T00-00-00.000000.json", "model-b")
+
+    first = LMEvalAdapter().parse_lines(_rows(samples), path=samples)
+    second = LMEvalAdapter().parse_lines(_rows(samples), path=samples)
+
+    assert first == second
+
+
+def test_lm_eval_counts_each_unreadable_metric_value(tmp_path):
     rows = [{
         "doc_id": 7,
         "resps": [["answer"]],
@@ -173,11 +351,9 @@ def test_lm_eval_counts_each_unreadable_metric_value():
         "acc": "unreadable",
         "custom_metric": "pass",
     }]
+    path = tmp_path / "samples_custom_task_2026-07-09T22-44-17.123456.jsonl"
 
-    records, metadata = LMEvalAdapter().parse_lines(
-        rows,
-        path=Path("samples_custom_task_2026-07-09T22-44-17.123456.jsonl"),
-    )
+    records, metadata = LMEvalAdapter().parse_lines(rows, path=path)
 
     assert [(record.metric, record.score) for record in records] == [
         ("custom_metric", 1.0)
@@ -185,7 +361,7 @@ def test_lm_eval_counts_each_unreadable_metric_value():
     assert metadata == {"skipped_rows": 1, "model_name_inferred": True}
 
 
-def test_lm_eval_reserves_every_field_emitted_by_serializer():
+def test_lm_eval_reserves_every_field_emitted_by_serializer(tmp_path):
     row = {
         "doc_id": 3,
         "doc": 1,
@@ -201,23 +377,25 @@ def test_lm_eval_reserves_every_field_emitted_by_serializer():
         "task_metric": 0.25,
         "incidental_number": 17,
     }
+    path = tmp_path / "samples_task.jsonl"
 
-    records, _ = LMEvalAdapter().parse_lines([row], path=Path("samples_task.jsonl"))
+    records, _ = LMEvalAdapter().parse_lines([row], path=path)
 
     assert [(record.metric, record.score) for record in records] == [
         ("task_metric", 0.25)
     ]
 
 
-def test_lm_eval_falls_back_to_non_reserved_fields_without_metrics_list():
+def test_lm_eval_falls_back_to_non_reserved_fields_without_metrics_list(tmp_path):
     row = {
         "doc_id": 4,
         "resps": [["answer"]],
         "task_metric": 0.5,
         "legacy_numeric_field": 12,
     }
+    path = tmp_path / "samples_task.jsonl"
 
-    records, _ = LMEvalAdapter().parse_lines([row], path=Path("samples_task.jsonl"))
+    records, _ = LMEvalAdapter().parse_lines([row], path=path)
 
     assert [(record.metric, record.score) for record in records] == [
         ("task_metric", 0.5),

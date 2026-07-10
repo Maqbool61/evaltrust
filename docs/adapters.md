@@ -85,6 +85,16 @@ class LineAdapter(Protocol):
 Register specific formats in `LINE_REGISTRY`. Unclaimed rows keep using the
 existing generic JSONL record path.
 
+The lm-eval line adapter reads per-sample `samples_<task>_<timestamp>.jsonl`
+logs. When a sibling `results_*.json` sits in the same directory, it takes the
+top-level `model_name` from that file. A matching timestamp wins; if none match
+and exactly one results file is present, that file is used. Mixing samples from
+different runs in one directory can mislabel under the sole-file fallback, so
+keep each run's samples and results together (lm-eval's default layout). If no
+usable sibling is found, the model name is inferred from the samples filename.
+Metadata records which path was used via `model_name_inferred` and, on success,
+`model_name_source` (filename only).
+
 ## Testing it
 
 Add a test with a small fixture that represents the **real** file structure of the

@@ -6,6 +6,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- **lm-eval model names from sibling results files.** When a `results_*.json`
+  sits next to a samples log, the adapter uses its top-level `model_name`
+  instead of inferring the name from the samples filename.
 - **Line-format adapters.** JSONL ingest can detect specific row formats before
   falling through to the existing generic record path; lm-eval sample logs are
   the first supported format.

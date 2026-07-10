@@ -1,0 +1,6 @@
+{
+  "task_hashes": {},
+  "model_source": "hf",
+  "model_name": "EleutherAI/pythia-160m",
+  "model_name_sanitized": "EleutherAI__pythia-160m"
+}
