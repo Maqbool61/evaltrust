@@ -63,13 +63,31 @@ def audit_judge_reliability(
 
 
 def _consensus(data, judges, model_a, model_b) -> Finding:
-    winners = {}
+    winners: dict[str, str] = {}
+    skipped_judges: list[str] = []
     for j in judges:
         a_vals = [ex.judges[j][model_a] for ex in data.examples
                   if ex.judges and j in ex.judges and model_a in ex.judges[j]]
         b_vals = [ex.judges[j][model_b] for ex in data.examples
                   if ex.judges and j in ex.judges and model_b in ex.judges[j]]
+        if not a_vals or not b_vals:
+            skipped_judges.append(j)
+            continue
         winners[j] = model_b if np.mean(b_vals) >= np.mean(a_vals) else model_a
+    if not winners:
+        return Finding(
+            pillar=PILLAR,
+            title="No judges scored both models",
+            status=Status.SKIP,
+            why=(
+                "Every judge scored only one of the two models, so no "
+                "meaningful consensus can be computed."
+            ),
+            how_detected="All judges skipped: " + ", ".join(skipped_judges) + ".",
+            how_to_fix="Ensure every judge scores both models on the same examples.",
+            details={"check": "judge_consensus", "per_judge_winner": {},
+                     "unanimous": False},
+        )
 
     unique = set(winners.values())
     unanimous = len(unique) == 1
@@ -86,7 +104,7 @@ def _consensus(data, judges, model_a, model_b) -> Finding:
         ),
         how_detected=(
             f"Each judge's preferred model: "
-            + ", ".join(f"{j}->{winners[j]}" for j in judges) + "."
+            + ", ".join(f"{j}->{winners[j]}" for j in winners) + (f" (skipped — scored only one model: {chr(123)}{chr(44).join(skipped_judges)}{chr(125)})" if skipped_judges else "") + "."
         ),
         how_to_fix=(
             f"Every judge preferred {winner}; the verdict is judge-independent."

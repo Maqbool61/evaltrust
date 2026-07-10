@@ -81,3 +81,30 @@ def test_findings_obey_golden_rule():
     for f in audit_judge_reliability(make_data(ex), "A", "B"):
         assert f.why.strip() and f.how_detected.strip() and f.how_to_fix.strip()
         assert f.pillar == "Judge Reliability"
+
+
+def test_consensus_skips_judge_that_scored_only_one_model():
+    # gpt scored both models; claude scored only model A — should not nan-compare
+    ex = []
+    for _ in range(10):
+        ex.append({
+            "gpt":    {"A": 0.0, "B": 1.0},
+            "claude": {"A": 0.5},           # B is missing entirely
+        })
+    findings = audit_judge_reliability(make_data(ex), "A", "B")
+    consensus = by_check(findings, "judge_consensus")
+    # Must not crash, must not silently default via nan
+    assert consensus.status in (Status.PASS, Status.FAIL, Status.WARN)
+    # claude should appear in the skipped note, not as a winner
+    assert "claude" not in consensus.details["per_judge_winner"]
+    assert "skipped" in consensus.how_detected
+
+
+def test_consensus_skips_when_all_judges_scored_only_one_model():
+    # both judges only scored model A — winners dict will be empty
+    ex = [{"gpt": {"A": 0.5}, "claude": {"A": 0.7}} for _ in range(10)]
+    findings = audit_judge_reliability(make_data(ex), "A", "B")
+    consensus = by_check(findings, "judge_consensus")
+    assert consensus.status is Status.SKIP
+    assert "gpt" in consensus.how_detected
+    assert "claude" in consensus.how_detected
