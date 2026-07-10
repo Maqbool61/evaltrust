@@ -29,21 +29,26 @@ class LangSmithAdapter:
         model = "model"
 
         records: list[Record] = []
+        skipped = 0
         for run in raw:
             ref_id = run.get("reference_example_id")
             if ref_id is None:
                 continue
-            records.append(Record(str(ref_id), model, _run_score(run)))
+            score = _run_score(run)
+            if score is None:
+                skipped += 1     # has a reference_example_id but no usable avg
+                continue
+            records.append(Record(str(ref_id), model, score))
 
         if not records:
-            raise ValueError(
-                "No LangSmith runs with a reference_example_id found")
-        return records_to_evaldata(records, self.source_format)
+            raise ValueError("No usable feedback scores found in the LangSmith export")
+        return records_to_evaldata(
+            records, self.source_format, {"skipped_rows": skipped})
 
 
-def _run_score(run: dict) -> float:
+def _run_score(run: dict) -> float | None:
     stats = run.get("feedback_stats") or {}
     scores = [coerce_score(s["avg"]) for s in stats.values() if s.get("avg") is not None]
     if scores:
         return float(np.mean(scores))
-    raise ValueError(f"LangSmith run {run.get('id', '?')} has no feedback scores")
+    return None

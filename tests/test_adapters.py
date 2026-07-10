@@ -479,6 +479,30 @@ def test_langsmith_raises_when_no_run_has_a_reference_example_id():
         LangSmithAdapter().parse(raw)
 
 
+def test_langsmith_skips_and_counts_a_run_with_no_usable_avg():
+    # A run with a reference_example_id but empty/unusable feedback_stats must
+    # not sink the whole export -- skip it and count it, like the CSV/generic/
+    # Inspect/OpenEvals adapters already do for a single bad row.
+    raw = LANGSMITH + [
+        {"id": "r3", "reference_example_id": "ex3", "feedback_stats": {}},
+        {"id": "r4", "reference_example_id": "ex4",
+         "feedback_stats": {"correctness": {"n": 0, "avg": None}}},
+    ]
+    data = LangSmithAdapter().parse(raw)
+    assert data.n_examples == 2                  # ex1, ex2 only
+    assert data.metadata["skipped_rows"] == 2     # ex3, ex4 counted, not dropped silently
+
+
+def test_langsmith_raises_when_every_run_has_no_usable_avg():
+    raw = [
+        {"id": "r1", "reference_example_id": "ex1", "feedback_stats": {}},
+        {"id": "r2", "reference_example_id": "ex2",
+         "feedback_stats": {"correctness": {"n": 0, "avg": None}}},
+    ]
+    with pytest.raises(ValueError):
+        LangSmithAdapter().parse(raw)
+
+
 def test_langsmith_does_not_false_positive_on_other_fixtures():
     a = LangSmithAdapter()
     for other in (PROMPTFOO, NATIVE, LONG, WIDE, DEEPEVAL_SNAKE, DEEPEVAL_CAMEL,
