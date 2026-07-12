@@ -142,12 +142,12 @@ def bootstrap_statistic_ci(
 ) -> tuple[float, float]:
     """Percentile bootstrap CI for an arbitrary statistic of a paired sample.
 
-    Resamples the sample's indices with replacement ``n_resamples`` times and
-    applies ``statistic`` to the resampled matrix. ``statistic`` must accept a
-    2-D array of shape ``(n_resamples, n)`` — one bootstrap resample per row —
-    and return a 1-D array with the statistic for each row (i.e. it reduces the
-    last axis), the same vectorized contract ``scipy.stats.bootstrap`` uses. This
-    keeps the CI fast enough to run inside every audit.
+    Resamples the sample's indices with replacement in blocks bounded by the
+    module's memory cap and applies ``statistic`` to each block. ``statistic``
+    must accept a 2-D array of shape ``(rows, n)`` — one bootstrap resample per
+    row — and return a 1-D array with the statistic for each row (i.e. it reduces
+    the last axis), the same vectorized contract ``scipy.stats.bootstrap`` uses.
+    This keeps the CI fast enough to run inside every audit.
 
     Seeded and deterministic. Reused for Cohen's *d* on the paired differences
     and for the paired risk difference (the mean) on pass/fail data.
@@ -166,8 +166,16 @@ def bootstrap_statistic_ci(
 
     rng = np.random.default_rng(seed)
     n = vals.size
-    idx = rng.integers(0, n, size=(n_resamples, n))
-    estimates = np.asarray(statistic(vals[idx]), dtype=float)
+    estimates = np.empty(n_resamples, dtype=float)
+    rows = _chunk_rows(n, n_resamples)
+    pos = 0
+    while pos < n_resamples:
+        block = min(rows, n_resamples - pos)
+        idx = rng.integers(0, n, size=(block, n))
+        estimates[pos:pos + block] = np.asarray(
+            statistic(vals[idx]), dtype=float,
+        )
+        pos += block
 
     alpha = 1.0 - confidence
     lo_pct, hi_pct = 100 * (alpha / 2), 100 * (1 - alpha / 2)

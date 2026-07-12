@@ -343,6 +343,43 @@ def test_bootstrap_ci_is_bitwise_invariant_to_chunk_size(monkeypatch):
     assert big_bca == small_bca
 
 
+def test_bootstrap_statistic_ci_bounds_each_statistic_block(monkeypatch):
+    values = np.arange(8, dtype=float)
+    cap = 16
+    monkeypatch.setattr(_rs, "_MAX_RESAMPLE_CELLS", cap)
+
+    def recording_mean(matrix):
+        assert matrix.shape[0] * values.size <= cap
+        return matrix.mean(axis=-1)
+
+    bootstrap_statistic_ci(values, recording_mean, n_resamples=7, seed=0)
+
+
+def test_bootstrap_statistic_ci_is_bitwise_invariant_to_chunk_size(monkeypatch):
+    from evaltrust.stats.effect import cohens_d_paired_along_rows
+
+    finite = np.random.default_rng(13).normal(0.3, 1.0, size=17)
+    non_finite_capable = np.array([1.0, 1.0, -1.0, -1.0])
+    monkeypatch.setattr(_rs, "_MAX_RESAMPLE_CELLS", 10**12)
+    big_mean = bootstrap_statistic_ci(
+        finite, _mean_axis, n_resamples=301, seed=7,
+    )
+    big_cohens_d = bootstrap_statistic_ci(
+        non_finite_capable, cohens_d_paired_along_rows,
+        n_resamples=401, seed=0,
+    )
+    monkeypatch.setattr(_rs, "_MAX_RESAMPLE_CELLS", 1)
+    small_mean = bootstrap_statistic_ci(
+        finite, _mean_axis, n_resamples=301, seed=7,
+    )
+    small_cohens_d = bootstrap_statistic_ci(
+        non_finite_capable, cohens_d_paired_along_rows,
+        n_resamples=401, seed=0,
+    )
+    assert big_mean == small_mean
+    assert big_cohens_d == small_cohens_d
+
+
 def test_permutation_is_bitwise_invariant_to_chunk_size(monkeypatch):
     diffs = np.random.default_rng(12).normal(0.2, 1.0, size=4000)
     monkeypatch.setattr(_rs, "_MAX_RESAMPLE_CELLS", 10**12)
