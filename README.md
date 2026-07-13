@@ -261,6 +261,18 @@ pip install evaltrust
 evaltrust audit results.json --plain --fail-under moderate
 ```
 
+### Exit codes
+
+The CLI uses a stable exit-code contract you can gate on:
+
+| Code | Meaning |
+|------|---------|
+| `0` | The audit ran and the verdict met the gate (or no gate was set). |
+| `1` | The audit ran, but the gate failed: `--strict`, or `--fail-under` not met, or `diff` found a regression. This is the "block the build" code. |
+| `2` | The audit could not run: bad usage, a missing or unreadable file, an unrecognised format, or an invalid config. This is an error, not a verdict. |
+
+So `1` means "the evaluation isn't trustworthy enough," while `2` means "something is wrong with the inputs" — CI can tell the two apart.
+
 More patterns in [`docs/integrations.md`](docs/integrations.md).
 
 ## What it checks

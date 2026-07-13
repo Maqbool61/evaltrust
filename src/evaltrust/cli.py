@@ -155,7 +155,7 @@ def audit(
                 data = next(iter(suite.values()))
                 report = run_audit(data, model_a=model_a, model_b=model_b,
                                    threshold=threshold, config=cfg)
-    except FileNotFoundError as e:
+    except OSError as e:  # missing, unreadable, or a directory given as a file
         _err.print(f"[red]{e}[/red]")
         raise typer.Exit(code=2)
     except UnknownFormatError as e:
@@ -218,7 +218,7 @@ def diff(
     try:
         old_data = json.loads(Path(old).read_text())
         new_data = json.loads(Path(new).read_text())
-    except FileNotFoundError as e:
+    except OSError as e:  # missing, unreadable, or a directory given as a file
         _err.print(f"[red]{e}[/red]")
         raise typer.Exit(code=2)
     except json.JSONDecodeError as e:

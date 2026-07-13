@@ -15,6 +15,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and thresholds that produced the verdict), also exposed as
   `evaltrust.SCHEMA_VERSION` / `evaltrust.METHODOLOGY_VERSION`. Downstream tooling
   can pin to these instead of guessing.
+- **Documented exit-code contract.** The CLI's exit codes are now a documented,
+  test-locked contract for CI: `0` = ran and met the gate, `1` = ran but the gate
+  failed (`--strict` / `--fail-under` / a `diff` regression), `2` = could not run
+  (bad input/usage/config). See the README.
 - **Line-format adapters.** JSONL ingest can detect specific row formats before
   falling through to the existing generic record path; lm-eval sample logs are
   the first supported format.
