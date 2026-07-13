@@ -107,3 +107,39 @@ def test_load_suite_jsonl_single_metric_is_one_entry(tmp_path):
     p.write_text('{"id": "q1", "model": "A", "score": 1}\n'
                  '{"id": "q1", "model": "B", "score": 0}\n')
     assert list(load_suite(str(p)).keys()) == ["score"]
+
+
+def test_load_suite_inspect_multi_scorer_fans_out(tmp_path):
+    # A multi-scorer Inspect log must fan out into one metric per scorer, the
+    # same way a generic file with a metric column does -- not collapse to the
+    # first scorer.
+    p = tmp_path / "inspect.json"
+    p.write_text(json.dumps({
+        "eval": {"eval_id": "e", "task": "t", "model": "m"},
+        "samples": [
+            {"id": "a", "scores": {"match": {"value": "C"}, "includes": {"value": "I"}}},
+            {"id": "b", "scores": {"match": {"value": "I"}, "includes": {"value": "C"}}},
+        ],
+    }))
+    suite = load_suite(str(p))
+    assert set(suite.keys()) == {"match", "includes"}
+    # Each metric must carry its OWN scores, not a copy of the first scorer's.
+    assert [ex.scores["m"] for ex in suite["match"].examples] == [1.0, 0.0]      # C, I
+    assert [ex.scores["m"] for ex in suite["includes"].examples] == [0.0, 1.0]   # I, C
+
+
+def test_load_suite_openevals_multi_scorer_fans_out(tmp_path):
+    # OpenEvals keys each row by scorer name; every distinct key must become its
+    # own metric rather than only the first surviving.
+    p = tmp_path / "openevals.json"
+    p.write_text(json.dumps([
+        {"key": "correctness", "score": 1.0, "input": "q1"},
+        {"key": "helpfulness", "score": 0.0, "input": "q1"},
+        {"key": "correctness", "score": 0.0, "input": "q2"},
+        {"key": "helpfulness", "score": 1.0, "input": "q2"},
+    ]))
+    suite = load_suite(str(p))
+    assert set(suite.keys()) == {"correctness", "helpfulness"}
+    # Each metric must carry its OWN scores, not a copy of the first scorer's.
+    assert [ex.scores["model"] for ex in suite["correctness"].examples] == [1.0, 0.0]
+    assert [ex.scores["model"] for ex in suite["helpfulness"].examples] == [0.0, 1.0]

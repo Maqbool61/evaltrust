@@ -444,10 +444,10 @@ def test_inspect_numeric_and_boolean_values():
     assert got == [0.75, 1.0, 1.0]
 
 
-def test_inspect_multiple_scorers_use_the_first_like_openevals():
-    # A dedicated adapter yields a single-metric EvalData (the suite fan-out is
-    # only for the generic record path), so, as with the OpenEvals adapter, the
-    # first scorer becomes the audited metric.
+def test_inspect_multiple_scorers_use_the_first_on_the_single_audit_path():
+    # On the single-audit path, parse() yields a single-metric EvalData -- the
+    # first scorer -- as with the OpenEvals adapter. (The suite path fans every
+    # scorer out into its own metric; see test_load_suite_inspect_multi_scorer.)
     raw = {"eval": {"eval_id": "e", "task": "t", "model": "m"},
            "samples": [
                {"id": "a", "scores": {"match": {"value": "C"},
@@ -471,6 +471,23 @@ def test_inspect_skips_unscored_values_and_counts_them():
     data = InspectAdapter().parse(raw)
     assert data.n_examples == 2                      # only ids 1 and 5 scored
     assert data.metadata["skipped_rows"] == 3        # null + list + malformed, counted
+
+
+def test_inspect_counts_samples_with_no_usable_scores_like_openevals():
+    # A real sample whose scores are missing or not a mapping is a dropped row
+    # (counted), matching how OpenEvals counts a row with score=None. A non-dict
+    # entry is not a sample at all, so -- as in OpenEvals -- it is not counted.
+    raw = {"eval": {"eval_id": "e", "task": "t", "model": "m"},
+           "samples": [
+               {"id": 1, "scores": {"s": {"value": "C"}}},   # scored
+               {"id": 2},                                    # no scores -> counted
+               {"id": 3, "scores": "oops"},                  # scores not a mapping -> counted
+               "garbage",                                    # not a sample -> not counted
+               {"id": 4, "scores": {"s": {"value": "I"}}},   # scored
+           ]}
+    data = InspectAdapter().parse(raw)
+    assert data.n_examples == 2                      # ids 1 and 4
+    assert data.metadata["skipped_rows"] == 2        # ids 2 and 3; "garbage" not counted
 
 
 def test_inspect_detect_requires_a_score_shaped_value():

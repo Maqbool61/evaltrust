@@ -156,11 +156,14 @@ def load_suite(path: str) -> "OrderedDict[str, EvalData]":
         return records_to_suite(records, fmt, {"skipped_rows": len(skipped)})
 
     def _suite_from_json() -> "OrderedDict[str, EvalData]":
-        # Only the generic record list can carry a metric column.
+        # Generic record lists carry a metric column; tool adapters that expose
+        # parse_suite fan out their scorers into one metric each.
         raw = json.loads(text)
         adapter = detect_adapter(raw)
         if adapter.source_format == "generic":
             return _suite_from_rows(_find_record_list(raw), "generic")
+        if hasattr(adapter, "parse_suite"):
+            return adapter.parse_suite(raw)
         return OrderedDict([(DEFAULT_METRIC, adapter.parse(raw))])
 
     def _suite_from_jsonl() -> "OrderedDict[str, EvalData]":

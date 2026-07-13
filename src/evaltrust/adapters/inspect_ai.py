@@ -3,10 +3,13 @@
 An Inspect ``EvalLog`` has the model under ``eval.model`` and a list of
 ``samples``, each with per-scorer results under ``sample.scores``
 (``{scorer: {"value": ...}}``). A log holds one model, so compare two runs with
-``evaltrust audit runA.json runB.json``. The first scorer is the audited metric.
+``evaltrust audit runA.json runB.json``. On the single-audit path the first
+scorer is the audited metric; on the suite path every scorer becomes a metric.
 """
 
 from __future__ import annotations
+
+from collections import OrderedDict
 
 from ..core.schema import EvalData
 from .common import Record, coerce_score, records_to_suite
@@ -42,7 +45,7 @@ class InspectAdapter:
                     for v in s["scores"].values())
             for s in samples)
 
-    def parse(self, raw) -> EvalData:
+    def _to_suite(self, raw) -> "OrderedDict[str, EvalData]":
         if not self.detect(raw):
             raise ValueError("Not an Inspect eval log")
         raw_model = raw["eval"].get("model")
@@ -52,11 +55,14 @@ class InspectAdapter:
         skipped = 0
         for idx, sample in enumerate(raw["samples"]):
             if not isinstance(sample, dict):
-                continue
+                continue                 # not a sample; nothing to drop
             sid = sample.get("id")
             ex_id = str(sid) if sid is not None else str(idx)
             scores = sample.get("scores")
             if not isinstance(scores, dict):
+                # A real sample with no usable scores is a dropped row, counted
+                # like OpenEvals counts a row with score=None.
+                skipped += 1
                 continue
             for scorer, score in scores.items():
                 # Count present-but-unusable entries so Data Quality isn't understated.
@@ -72,7 +78,12 @@ class InspectAdapter:
 
         if not records:
             raise ValueError("No scored samples found in the Inspect eval log")
+        return records_to_suite(records, self.source_format, {"skipped_rows": skipped})
 
-        # First scorer is the audited metric (fan-out is the generic path's job).
-        suite = records_to_suite(records, self.source_format, {"skipped_rows": skipped})
-        return next(iter(suite.values()))
+    def parse(self, raw) -> EvalData:
+        # Single-audit path: first scorer is the audited metric.
+        return next(iter(self._to_suite(raw).values()))
+
+    def parse_suite(self, raw) -> "OrderedDict[str, EvalData]":
+        # Suite path: every scorer fans out into its own metric.
+        return self._to_suite(raw)

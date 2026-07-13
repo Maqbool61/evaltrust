@@ -17,6 +17,8 @@ whole file, so the Data Quality finding reflects the drop.
 
 from __future__ import annotations
 
+from collections import OrderedDict
+
 from ..core.schema import EvalData
 from .common import Record, coerce_score, records_to_suite
 
@@ -48,7 +50,7 @@ class OpenEvalsAdapter:
     def detect(self, raw) -> bool:
         return _looks_like_openevals(raw)
 
-    def parse(self, raw) -> EvalData:
+    def _to_suite(self, raw) -> "OrderedDict[str, EvalData]":
         if not isinstance(raw, list) or not raw:
             raise ValueError("No OpenEvals results list found")
 
@@ -71,7 +73,12 @@ class OpenEvalsAdapter:
 
         if not records:
             raise ValueError("No usable scores found in the OpenEvals results")
+        return records_to_suite(records, self.source_format, {"skipped_rows": skipped})
 
-        suite = records_to_suite(records, self.source_format, {"skipped_rows": skipped})
-        # Return the first (or only) metric dataset as the primary EvalData
-        return next(iter(suite.values()))
+    def parse(self, raw) -> EvalData:
+        # Single-audit path: first metric is the audited one.
+        return next(iter(self._to_suite(raw).values()))
+
+    def parse_suite(self, raw) -> "OrderedDict[str, EvalData]":
+        # Suite path: every distinct key fans out into its own metric.
+        return self._to_suite(raw)
