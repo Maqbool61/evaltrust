@@ -25,6 +25,13 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (still driven by the effect-size magnitude).
 
 ### Fixed
+- **Multi-scorer Inspect and OpenEvals logs fan out into a full metric suite.** On
+  the suite path (`load_suite` / `audit_suite`), every scorer in an Inspect or
+  OpenEvals log now becomes its own metric instead of silently keeping only the
+  first and dropping the rest — matching how generic files with a `metric` column
+  already behave. The single-audit path is unchanged (still the first scorer). As
+  part of this, an Inspect sample with no usable scores is now counted as a
+  skipped row, consistent with the OpenEvals adapter. Fixes #48.
 - **`_err` now writes to stderr, not stdout (#51).** `Console(stderr=False)`
   caused all CLI error messages (load failures, config errors, unrecognised
   format, non-zero exits) to pollute stdout — corrupting `--json` output and
