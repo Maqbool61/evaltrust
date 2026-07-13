@@ -36,7 +36,7 @@ dependencies = [
 [project.optional-dependencies]
 # statsmodels is used only in the test suite, to validate EvalTrust's statistics
 # against an independent reference implementation. It is not a runtime dependency.
-dev = ["pytest>=8.0", "statsmodels>=0.14"]
+dev = ["pytest>=8.0", "statsmodels>=0.14", "cffconvert>=2.0"]
 
 [project.urls]
 Homepage = "https://github.com/k-dickinson/evaltrust"
