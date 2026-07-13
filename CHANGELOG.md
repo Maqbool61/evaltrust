@@ -18,6 +18,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   rank correlation of 0.80 and 80% agreement are not the same bar. Both default to
   `0.8`, so output is unchanged until you set them apart.
 
+- **Confidence interval on the effect size.** The effect-size finding now reports
+  a bootstrap CI alongside the point estimate — on Cohen's *d* for continuous
+  scores, on the risk difference for pass/fail — via a new seeded
+  `stats.bootstrap_statistic_ci` primitive. The PASS/WARN rule is unchanged
+  (still driven by the effect-size magnitude).
+
 ### Fixed
 - **`_err` now writes to stderr, not stdout (#51).** `Console(stderr=False)`
   caused all CLI error messages (load failures, config errors, unrecognised
