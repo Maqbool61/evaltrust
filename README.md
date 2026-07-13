@@ -136,6 +136,9 @@ pip install -e ".[dev]"
 pytest
 ```
 
+The same common development tasks are available as `make install`, `make test`,
+and `make audit`.
+
 </details>
 
 ## Quick start
