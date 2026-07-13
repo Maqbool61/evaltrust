@@ -55,11 +55,14 @@ class InspectAdapter:
         skipped = 0
         for idx, sample in enumerate(raw["samples"]):
             if not isinstance(sample, dict):
-                continue
+                continue                 # not a sample; nothing to drop
             sid = sample.get("id")
             ex_id = str(sid) if sid is not None else str(idx)
             scores = sample.get("scores")
             if not isinstance(scores, dict):
+                # A real sample with no usable scores is a dropped row, counted
+                # like OpenEvals counts a row with score=None.
+                skipped += 1
                 continue
             for scorer, score in scores.items():
                 # Count present-but-unusable entries so Data Quality isn't understated.
