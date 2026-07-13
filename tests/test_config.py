@@ -15,8 +15,11 @@ def test_defaults_match_the_documented_values():
     assert c.judge_correlation_threshold == 0.8
 
 
-def test_from_dict_ignores_unknown_keys():
-    c = AuditConfig.from_dict({"alpha": 0.01, "nonsense": 123})
+def test_from_dict_warns_and_ignores_unknown_keys():
+    # Unknown keys warn (so a typo isn't silent) but don't stop the known keys
+    # from applying.
+    with pytest.warns(UserWarning, match="nonsense"):
+        c = AuditConfig.from_dict({"alpha": 0.01, "nonsense": 123})
     assert c.alpha == 0.01
 
 
