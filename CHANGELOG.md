@@ -5,6 +5,12 @@ All notable changes to this project are documented here. The format is based on
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- **Cluster-aware CI sign orientation fix.** `cluster_groups(trailer, leader)` is now called for the main CI so the clustered interval has the same sign as `diffs = leader - trailer`. Previously `cluster_groups(leader, trailer)` returned `trailer - leader`, flipping the reported CI on clustered data.
+
+- **TOST CI uses unoriented cluster groups.** The TOST equivalence CI now calls `cluster_groups(model_a, model_b)` directly instead of reusing the leader/trailer-oriented `clusters`, so the signed gap matches `raw = differences(model_a, model_b)`.
+
+- **Regression test locking CI orientation.** `test_clustered_ci_same_sign_and_wider_than_unclustered` asserts that on clustered data where B outperforms A the clustered CI is positive (same sign as non-clustered) and wider (clustering inflates variance).
+
 - **Cluster-aware TOST equivalence interval.** The equivalence (TOST) CI now
   routes through `bootstrap_ci_clustered` when a `group_id` is present, matching
   the variance estimator used for the significance CI. Previously the TOST interval
