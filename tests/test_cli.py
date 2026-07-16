@@ -348,8 +348,8 @@ def test_utf8_encoding_cli_audit(tmp_path):
     
     result = runner.invoke(app, ["audit", str(audit_file), "--plain"])
     
-    # Exit code should be 2 for warning (n too small) or 0, but NOT a crash
-    assert result.exit_code in (0, 1, 2)
-    # The file should be read without UnicodeDecodeError
-    assert not isinstance(result.exception, UnicodeDecodeError)
-    assert "UnicodeDecodeError" not in result.output
+    # Assert successful execution
+    assert result.exit_code == 0
+    assert result.exception is None
+    # Verify the file was correctly loaded and processed
+    assert "A vs B" in result.stdout
