@@ -130,19 +130,45 @@ def audit_slices(
         overall_mean_diff = float(data.differences(model_a, model_b).mean())
     overall_sign = _sign(overall_mean_diff)
 
-    k = len(groups)
+    # Bonferroni corrects for the number of tests actually performed. Slices
+    # that fall below ``min_slice_size`` are recorded but not tested, so they
+    # do not enter the family — otherwise the threshold shrinks below
+    # alpha / k_tested and a real regression can be missed.
+    testable = [(v, ex) for v, ex in groups.items() if len(ex) >= min_slice_size]
+    skipped = [(v, ex) for v, ex in groups.items() if len(ex) < min_slice_size]
+    k_total = len(groups)
+    k = len(testable)
+
+    if k == 0:
+        slice_details = [
+            {"value": v, "n": len(ex), "assessed": False,
+             "reason": "too_few_examples"}
+            for v, ex in groups.items()
+        ]
+        return [Finding(
+            pillar=PILLAR,
+            title=(f"All {k_total} slices of {slice_by!r} are too small to test"),
+            status=Status.SKIP,
+            why=(
+                "Per-slice comparison needs at least a handful of examples per "
+                "slice to test. With every slice below the minimum, the "
+                "breakdown can't tell whether any subgroup regresses."
+            ),
+            how_detected=(f"Every slice of {slice_by!r} has fewer than "
+                          f"{min_slice_size} paired examples."),
+            how_to_fix=(f"Collect more examples per {slice_by!r} value so each "
+                        f"slice has at least {min_slice_size}."),
+            details={"check": "slice_comparison", "slice_by": slice_by,
+                     "assessed": False, "reason": "all_slices_too_small",
+                     "min_slice_size": min_slice_size,
+                     "slices": slice_details},
+        )]
+
     corrected_alpha = alpha / k
 
     slice_details = []
     regressions: list[str] = []
-    for value, examples in groups.items():
-        n = len(examples)
-        if n < min_slice_size:
-            slice_details.append({
-                "value": value, "n": n, "assessed": False,
-                "reason": "too_few_examples",
-            })
-            continue
+    for value, examples in testable:
         p, mean_diff = _slice_pvalue(examples, model_a, model_b,
                                      n_resamples=n_resamples, seed=seed)
         significant = p < corrected_alpha
@@ -152,20 +178,25 @@ def audit_slices(
             and slice_sign != overall_sign
         )
         slice_details.append({
-            "value": value, "n": n, "assessed": True,
+            "value": value, "n": len(examples), "assessed": True,
             "p_value": p, "corrected_alpha": corrected_alpha,
             "mean_diff": mean_diff, "significant": significant,
             "regresses": regresses,
         })
         if regresses:
             regressions.append(value)
+    for value, examples in skipped:
+        slice_details.append({
+            "value": value, "n": len(examples), "assessed": False,
+            "reason": "too_few_examples",
+        })
 
     if regressions:
         status = Status.WARN
         title = (f"{len(regressions)} of {k} slices regress against the "
                  "overall result")
         listed = ", ".join(repr(v) for v in regressions)
-        how = (f"With Bonferroni across {k} slices (alpha/k = "
+        how = (f"With Bonferroni across {k} tested slices (alpha/k = "
                f"{corrected_alpha:.4f}), slices {listed} are significant in the "
                "opposite direction to the overall comparison.")
         fix = ("Investigate the flagged slices before shipping: the aggregate "
@@ -191,6 +222,7 @@ def audit_slices(
             "slice_by": slice_by,
             "assessed": True,
             "n_slices": k,
+            "n_slices_total": k_total,
             "corrected_alpha": corrected_alpha,
             "overall_mean_diff": overall_mean_diff,
             "regressions": regressions,

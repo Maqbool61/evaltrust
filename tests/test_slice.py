@@ -75,6 +75,62 @@ def test_small_slices_are_reported_but_not_tested():
     assert tiny["assessed"] is False
     assert tiny["reason"] == "too_few_examples"
     assert big["assessed"] is True
+    # Bonferroni family = tested slices only, not the raw group count.
+    assert f.details["n_slices"] == 1
+    assert f.details["n_slices_total"] == 2
+    assert f.details["corrected_alpha"] == 0.05 / 1
+
+
+def test_bonferroni_family_uses_only_tested_slices():
+    # 40 easy examples (B wins), 8 hard (A wins), plus five 2-example slices
+    # that must not enlarge the Bonferroni family: with k=7 (raw) the threshold
+    # 0.05/7 ~= 0.0071 misses the hard McNemar p ~ 0.0078; with k=2 (tested)
+    # the threshold 0.025 correctly rejects and flags 'hard' as a regression.
+    examples = []
+    for i in range(40):
+        examples.append(Example(f"e{i}", {"A": 0.0, "B": 1.0},
+                                attributes={"cat": "easy"}))
+    for i in range(8):
+        examples.append(Example(f"h{i}", {"A": 1.0, "B": 0.0},
+                                attributes={"cat": "hard"}))
+    for j in range(5):
+        for i in range(2):
+            examples.append(Example(f"t{j}_{i}", {"A": 0.0, "B": 1.0},
+                                    attributes={"cat": f"tiny{j}"}))
+    data = _data(examples)
+    (f,) = audit_slices(data, "A", "B", slice_by="cat", seed=0)
+    assert f.details["n_slices"] == 2      # only 'easy' and 'hard' were tested
+    assert f.details["n_slices_total"] == 7
+    assert f.details["corrected_alpha"] == 0.05 / 2
+    assert "hard" in f.details["regressions"]
+    assert f.status is Status.WARN
+
+
+def test_all_slices_too_small_returns_skip():
+    examples = [
+        Example("s0", {"A": 0.0, "B": 1.0}, attributes={"cat": "a"}),
+        Example("s1", {"A": 0.0, "B": 1.0}, attributes={"cat": "b"}),
+    ]
+    data = _data(examples)
+    (f,) = audit_slices(data, "A", "B", slice_by="cat", seed=0)
+    assert f.status is Status.SKIP
+    assert f.details["reason"] == "all_slices_too_small"
+
+
+def test_run_audit_emits_slice_skip_when_only_preferences_are_present():
+    from evaltrust.core.schema import Preference
+    examples = [
+        Example(f"e{i}", scores={},
+                preferences={"j": "B" if i < 6 else Preference.TIE},
+                attributes={"cat": "x"})
+        for i in range(10)
+    ]
+    data = EvalData(models=["A", "B"], examples=examples,
+                    source_format="test", metadata={})
+    report = run_audit(data, model_a="A", model_b="B", slice_by="cat", seed=0)
+    slice_f = _by_check(report.findings, "slice_comparison")
+    assert slice_f.status is Status.SKIP
+    assert slice_f.details["reason"] == "preference_only"
 
 
 def test_run_audit_appends_slice_finding_when_slice_by_is_set():

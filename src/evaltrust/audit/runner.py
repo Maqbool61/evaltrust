@@ -262,11 +262,29 @@ def _comparison(data, model_a, model_b, cfg, significant=None,
             n_resamples=cfg.n_resamples, seed=cfg.seed,
             significant=significant if preference_only else None)
 
-    if slice_by is not None and differences.size:
-        findings += audit_slices(
-            data, model_a, model_b, slice_by, alpha=cfg.alpha,
-            n_resamples=cfg.n_resamples, seed=cfg.seed,
-            overall_mean_diff=float(differences.mean()))
+    if slice_by is not None:
+        if differences.size:
+            findings += audit_slices(
+                data, model_a, model_b, slice_by, alpha=cfg.alpha,
+                n_resamples=cfg.n_resamples, seed=cfg.seed,
+                overall_mean_diff=float(differences.mean()))
+        else:
+            findings.append(_score_skip(
+                "Per-slice Comparison",
+                "slice_comparison",
+                (
+                    "Preference-only data has no paired model scores to "
+                    "compare per slice."
+                    if preference_only else
+                    "No examples contain scores for both selected models, so "
+                    "there is nothing to slice."
+                ),
+                (
+                    "Add paired per-model scores to run the per-slice "
+                    "comparison."
+                ),
+                "preference_only" if preference_only else "no_paired_scores",
+            ))
 
     return AuditReport(
         model_a=model_a, model_b=model_b, n_examples=data.n_examples,
