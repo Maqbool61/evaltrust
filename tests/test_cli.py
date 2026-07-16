@@ -325,3 +325,24 @@ def test_config_typo_in_explicit_config_is_an_error(tmp_path):
                                  "--config", str(policy)])
     assert result.exit_code == 2
     assert "alpah" in result.output
+
+
+def test_contamination_utf8_encoding(tmp_path):
+    """Ensure the contamination command correctly loads non-ASCII characters explicitly as UTF-8."""
+    bench_file = tmp_path / "bench.jsonl"
+    ref_file = tmp_path / "ref.jsonl"
+    
+    # Chinese, Spanish, Russian, Arabic, and an Emoji
+    non_ascii_text = "你好, ¿qué tal?, привет, مرحبا, 🌍"
+    
+    bench_content = f'{{"prompt": "{non_ascii_text}"}}\n'
+    ref_content = f'{{"prompt": "{non_ascii_text}"}}\n'
+    
+    bench_file.write_text(bench_content, encoding="utf-8")
+    ref_file.write_text(ref_content, encoding="utf-8")
+    
+    result = runner.invoke(app, ["contamination", str(bench_file), str(ref_file)])
+    
+    # 100% contamination results in an exit code of 1
+    assert result.exit_code == 1
+    assert "Exact matches found:   1" in result.stdout
