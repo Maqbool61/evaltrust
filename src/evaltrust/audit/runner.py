@@ -322,6 +322,17 @@ def _single(data, model, threshold, cfg) -> AuditReport:
         findings.append(dq)
     findings += audit_single(data, model, threshold=threshold, config=cfg)
 
+    # The judge checks are about the judges, not the pair, so they run for a
+    # single model too (inter-judge agreement + calibration against a gold judge).
+    if data.has_judges:
+        findings += audit_judge_reliability(
+            data, model, agreement_threshold=cfg.judge_agreement_threshold)
+        findings += audit_judge_calibration(
+            data, model,
+            threshold=cfg.judge_agreement_threshold,
+            correlation_threshold=cfg.judge_correlation_threshold,
+            reference_judge=cfg.reference_judge)
+
     return AuditReport(
         model_a=model, model_b=None, n_examples=data.n_examples,
         source_format=data.source_format, findings=findings,

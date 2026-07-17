@@ -5,6 +5,11 @@ All notable changes to this project are documented here. The format is based on
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- **Judge reliability and calibration now run in single-model mode.** A
+  single-model audit whose file carries multiple judges (and/or a gold judge)
+  now reports inter-judge agreement and calibration-vs-gold instead of omitting
+  them. Consensus ("which model do judges prefer") stays comparison-only, since
+  there's no second model to agree on. Two-model output is unchanged.
 - **Cluster-aware CI sign orientation fix.** `cluster_groups(trailer, leader)` is now called for the main CI so the clustered interval has the same sign as `diffs = leader - trailer`. Previously `cluster_groups(leader, trailer)` returned `trailer - leader`, flipping the reported CI on clustered data.
 
 - **TOST CI uses unoriented cluster groups.** The TOST equivalence CI now calls `cluster_groups(model_a, model_b)` directly instead of reusing the leader/trailer-oriented `clusters`, so the signed gap matches `raw = differences(model_a, model_b)`.
