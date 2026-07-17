@@ -25,7 +25,6 @@ import csv
 import io
 import json
 import logging
-import os
 from collections import OrderedDict
 from pathlib import Path
 from typing import Generator, Iterable
@@ -61,8 +60,6 @@ def _iter_jsonl_lines(path: Path) -> Generator[dict, None, None]:
     name = path.name
     with path.open(encoding="utf-8") as fh:
         for i, raw_line in enumerate(fh, start=1):
-            # Normalise line endings (open() in text mode handles \\r\\n and \\r
-            # transparently on all platforms, but explicit stripping is cleaner).
             line = raw_line.rstrip("\n").rstrip("\r")
             if not line.strip():
                 continue
@@ -178,10 +175,12 @@ def _records_from_jsonl_iter(
 ) -> tuple[list[Record], str, dict]:
     """Build records from a dict iterator (used for large JSONL files).
 
-    We must materialise the row list because ``detect_line_adapter`` and
-    ``dicts_to_records`` both need random-access to determine the column layout.
-    However we materialise from a *line-at-a-time* iterator so the file is
-    never fully read into a single string.
+    The row list is materialised from a line-at-a-time iterator so the file is
+    never fully read into a single string.  ``detect_line_adapter`` and
+    ``dicts_to_records`` both need the full row list to determine column layout,
+    so materialisation into a list of dicts (rather than a raw string) is the
+    correct boundary: each dict is a single parsed record, not a copy of the
+    whole file.
     """
     rows = list(row_iter)
     if not rows:
@@ -253,7 +252,6 @@ def _load_json_streamed(path: Path) -> EvalData | None:
             first_byte = ch
 
     if first_byte == b"[":
-        # Top-level array: iterate items directly.
         rows: list[dict] = []
         with path.open("rb") as fh:
             for item in ijson.items(fh, "item"):
@@ -265,28 +263,22 @@ def _load_json_streamed(path: Path) -> EvalData | None:
                 rows.append(item)
         if not rows:
             raise UnknownFormatError("The JSON file has no data rows.")
-        raw = rows  # treat as a top-level list for adapter detection
+        raw = rows
         return detect_adapter(raw).parse(raw)
 
     if first_byte == b"{":
-        # Object root: stream "examples" array if present; otherwise give up.
         rows = []
         with path.open("rb") as fh:
-            # Collect the top-level keys we need for the native adapter.
             top: dict = {}
             try:
                 for item in ijson.kvitems(fh, ""):
                     key, value = item
                     if key == "examples":
-                        # value is a list when using kvitems — but for very
-                        # large arrays ijson may yield individual items instead.
-                        # Use items() prefix instead for true streaming.
                         break
                     top[key] = value
             except Exception:
-                return None  # structure not as expected; let caller fall back
+                return None
 
-        # Now stream the examples array properly.
         try:
             with path.open("rb") as fh:
                 rows = list(ijson.items(fh, "examples.item"))
@@ -294,15 +286,83 @@ def _load_json_streamed(path: Path) -> EvalData | None:
             return None
 
         if not rows:
-            # No "examples" key → not the native shape; fall back.
             return None
 
-        # Reconstruct just enough of the raw dict for the native adapter.
         raw_obj: dict = dict(top)
         raw_obj["examples"] = rows
         return detect_adapter(raw_obj).parse(raw_obj)
 
-    return None  # unrecognised shape; caller will fall back
+    return None
+
+
+def _suite_from_json_streamed(path: Path) -> "OrderedDict[str, EvalData] | None":
+    """Try to build a suite from a large JSON file using ijson.
+
+    Mirrors ``_load_json_streamed`` but routes through ``records_to_suite`` /
+    ``parse_suite`` so multi-metric JSON files are handled correctly instead of
+    being collapsed into a single DEFAULT_METRIC entry.
+
+    Returns ``None`` when ijson is unavailable or the shape is unsupported.
+    """
+    try:
+        import ijson  # type: ignore[import]
+    except ImportError:
+        return None
+
+    with path.open("rb") as fh:
+        first_byte = b""
+        while not first_byte.strip():
+            ch = fh.read(1)
+            if not ch:
+                break
+            first_byte = ch
+
+    if first_byte == b"[":
+        rows: list[dict] = []
+        with path.open("rb") as fh:
+            for item in ijson.items(fh, "item"):
+                if not isinstance(item, dict):
+                    raise ValueError(
+                        f"Expected a JSON array of objects in '{path.name}', "
+                        f"got a {type(item).__name__} element."
+                    )
+                rows.append(item)
+        if not rows:
+            raise UnknownFormatError("The JSON file has no data rows.")
+        skipped: list = []
+        records = dicts_to_records(rows, skipped)
+        return records_to_suite(records, "generic", {"skipped_rows": len(skipped)})
+
+    if first_byte == b"{":
+        rows = []
+        with path.open("rb") as fh:
+            top: dict = {}
+            try:
+                for item in ijson.kvitems(fh, ""):
+                    key, value = item
+                    if key == "examples":
+                        break
+                    top[key] = value
+            except Exception:
+                return None
+
+        try:
+            with path.open("rb") as fh:
+                rows = list(ijson.items(fh, "examples.item"))
+        except Exception:
+            return None
+
+        if not rows:
+            return None
+
+        raw_obj: dict = dict(top)
+        raw_obj["examples"] = rows
+        adapter = detect_adapter(raw_obj)
+        if hasattr(adapter, "parse_suite"):
+            return adapter.parse_suite(raw_obj)
+        return OrderedDict([(DEFAULT_METRIC, adapter.parse(raw_obj))])
+
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -356,11 +416,9 @@ def load(path: str) -> EvalData:
             with p.open(encoding="utf-8") as fh:
                 head = fh.read(256)
             if head.lstrip().startswith("["):
-                # Whole file is a JSON array; use JSON streaming path.
-                if large:
-                    result = _load_json_streamed(p)
-                    if result is not None:
-                        return result
+                result = _load_json_streamed(p)
+                if result is not None:
+                    return result
                 text = p.read_text(encoding="utf-8")
                 return _load_json(text)
             return _load_jsonl_streamed(p)
@@ -369,12 +427,19 @@ def load(path: str) -> EvalData:
 
     # ---- Unknown extension: try JSON → JSONL → CSV ----
     if large:
-        # Try JSON streaming first.
+        # Try JSON streaming first; if ijson is absent or shape unsupported,
+        # fall through to the normal full-text JSON loader before trying JSONL.
         try:
             result = _load_json_streamed(p)
             if result is not None:
                 return result
         except (UnknownFormatError, ValueError):
+            pass
+        # ijson unavailable or unrecognised JSON shape — try full-text JSON.
+        try:
+            text = p.read_text(encoding="utf-8")
+            return _load_json(text)
+        except (json.JSONDecodeError, UnknownFormatError):
             pass
         # Try JSONL streaming.
         try:
@@ -455,10 +520,10 @@ def load_suite(path: str) -> "OrderedDict[str, EvalData]":
             with p.open(encoding="utf-8") as fh:
                 head = fh.read(256)
             if head.lstrip().startswith("["):
-                # Mis-named JSON array: try JSON streaming.
-                result = _load_json_streamed(p)
+                # Mis-named JSON array: stream via suite-aware path.
+                result = _suite_from_json_streamed(p)
                 if result is not None:
-                    return OrderedDict([(DEFAULT_METRIC, result)])
+                    return result
                 text = p.read_text(encoding="utf-8")
                 return _suite_from_json(text)
             return _suite_from_jsonl_streamed()
@@ -467,37 +532,44 @@ def load_suite(path: str) -> "OrderedDict[str, EvalData]":
             return _suite_from_json(text)
         return _suite_from_jsonl(text)
 
-    # ---- JSON (or fallback) ----
-    if suffix == ".json" or large:
-        if large and suffix != ".json":
-            # Unknown extension, large file: try streaming paths first.
-            try:
-                result = _load_json_streamed(p)
-                if result is not None:
-                    return OrderedDict([(DEFAULT_METRIC, result)])
-            except (UnknownFormatError, ValueError):
-                pass
-            try:
-                with p.open(encoding="utf-8") as fh:
-                    head = fh.read(256)
-                if not head.lstrip().startswith("["):
-                    return _suite_from_jsonl_streamed()
-            except (ValueError, UnknownFormatError):
-                pass
-            rows = list(_iter_csv_rows(p))
-            return _suite_from_rows(rows, "csv")
-
+    # ---- JSON ----
+    if suffix == ".json":
+        if large:
+            result = _suite_from_json_streamed(p)
+            if result is not None:
+                return result
+            # ijson unavailable or unrecognised shape: fall back to full load.
         text = p.read_text(encoding="utf-8")
         try:
             return _suite_from_json(text)
         except (json.JSONDecodeError, UnknownFormatError):
-            if suffix == ".json":
-                raise
-            try:
-                return _suite_from_jsonl(text)
-            except (ValueError, UnknownFormatError):
-                rows = list(csv.DictReader(io.StringIO(text)))
-                return _suite_from_rows(rows, "csv")
+            raise
+
+    # ---- Unknown extension ----
+    if large:
+        # Try suite-aware JSON streaming first.
+        try:
+            result = _suite_from_json_streamed(p)
+            if result is not None:
+                return result
+        except (UnknownFormatError, ValueError):
+            pass
+        # ijson absent or shape unsupported: try full-text JSON.
+        try:
+            text = p.read_text(encoding="utf-8")
+            return _suite_from_json(text)
+        except (json.JSONDecodeError, UnknownFormatError):
+            pass
+        # Try JSONL streaming.
+        try:
+            with p.open(encoding="utf-8") as fh:
+                head = fh.read(256)
+            if not head.lstrip().startswith("["):
+                return _suite_from_jsonl_streamed()
+        except (ValueError, UnknownFormatError):
+            pass
+        rows = list(_iter_csv_rows(p))
+        return _suite_from_rows(rows, "csv")
 
     # Small file, unknown extension.
     text = p.read_text(encoding="utf-8")

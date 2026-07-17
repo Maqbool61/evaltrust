@@ -194,12 +194,12 @@ class TestStreamingErrors:
 
     def test_empty_jsonl_raises_streamed(self, tmp_path):
         path = _write(tmp_path, "empty.jsonl", "\n  \n")
-        with self._force_stream(), pytest.raises(Exception):
+        with self._force_stream(), pytest.raises(UnknownFormatError):
             load(path)
 
     def test_empty_csv_raises_streamed(self, tmp_path):
         path = _write(tmp_path, "empty.csv", "id,model,score\n")
-        with self._force_stream(), pytest.raises(Exception):
+        with self._force_stream(), pytest.raises(UnknownFormatError):
             load(path)
 
     def test_malformed_jsonl_line_error_streamed(self, tmp_path):
