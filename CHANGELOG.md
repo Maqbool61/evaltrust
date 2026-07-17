@@ -18,6 +18,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   declare equivalence over-optimistically.
 
 ### Added
+- **Optional all-pairs comparison (`--all-pairs`).** Single-file audits can test
+  every declared model pair, correct across the pairs with shared scores, and
+  report which distinctions are statistically separable. The default remains
+  the two strongest models.
 - **Friendly enum string representations.** `Status` and `VerdictLevel` now render their friendly values when converted with `str(...)`.
 - **Per-slice / subgroup comparison (`--slice-by`).** The audit can now break
   the two-model comparison down by an optional per-example attribute (category,
