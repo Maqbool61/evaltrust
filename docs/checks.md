@@ -162,6 +162,42 @@ with **Bonferroni**: it divides the significance threshold by the number of
 metrics, so a metric is only called a real improvement if it clears the stricter
 bar. The suite's overall confidence is the **weakest** of its metrics.
 
+## Pairwise preference
+
+When your file records judge votes (A wins / B wins / tie) instead of a numeric
+score per model, EvalTrust runs an exact two-sided **sign test** on the decisive
+votes (ties excluded) and reports a seeded win-rate interval. This answers "is the
+preference real, or a coin toss?" See [input formats](input-formats.md) for the
+`winner`/`preference` shape.
+
+## Per-slice comparison (`--slice-by`)
+
+An overall improvement can hide a regression on an important subset. With
+`--slice-by <attribute>`, EvalTrust breaks the comparison down by a per-example
+attribute (category, difficulty, language) and tests each slice at a
+Bonferroni-corrected threshold across the slices actually tested (`alpha / k`).
+A slice is flagged as a **regression** only when it is *significantly opposite* to
+the overall direction, so an underpowered slice never trips the flag (it is still
+listed in `details.slices`). Slice tags come from the nested-JSON `attributes`
+field; see [input formats](input-formats.md).
+
+## All-pairs comparison (`--all-pairs`)
+
+By default a file with several models compares the two strongest. `--all-pairs`
+tests **every** model pair with shared scores and corrects across the pair family
+(`bonferroni` / `holm` / `none`), reporting which distinctions are statistically
+separable. With three or more models it also reports an advisory **rank-stability**
+finding: which leaderboard positions hold under resampling. This finding is
+advisory and never changes the verdict.
+
+## Bayesian view (`--bayesian`)
+
+`--bayesian` adds an advisory finding: the posterior probability that one model
+wins more often on decisive examples, with a credible interval, under a Jeffreys
+`Beta(0.5, 0.5)` prior. It is off by default, never changes the verdict, and
+answers "how confident am I that A beats B?" as a probability rather than a
+p-value.
+
 ## The verdict
 
 The overall verdict follows simple, documented rules rather than a weighted score:

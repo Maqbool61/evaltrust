@@ -51,7 +51,10 @@ saturation_fraction = 0.9
 | `n_resamples` | `10000` | Bootstrap / permutation resamples. |
 | `seed` | `0` | RNG seed (reproducibility). |
 | `correction` | `"bonferroni"` | Multiple-comparison correction for a multi-metric suite or an enabled all-pairs family: `bonferroni`, `holm`, or `none`. |
-| `all_pairs` | `false` | Also test every declared model pair. Off by default. |
+| `all_pairs` | `false` | Also test every declared model pair (`--all-pairs`). Off by default. |
+| `bayesian` | `false` | Add an advisory Bayesian win-probability finding (`--bayesian`). Off by default; never changes the verdict. |
+| `gated_metrics` | *(none)* | Metric names that must reach High confidence, or the whole suite is Low regardless of the other metrics. |
+| `metric_weights` | *(none)* | Per-metric weights (all positive). Validated and stored; reserved for a future weighted suite rollup. |
 
 ## Multiple-comparison correction
 

@@ -106,6 +106,39 @@ Attributes are currently read only from the nested-JSON adapter. CSV and
 generic record lists don't carry slice tags yet — a dedicated slice column for
 those formats is a possible follow-up.
 
+An optional `group_id` marks examples that are **not** independent — repeated
+judgments of the same item, or items sharing a task/template. When present, the
+significance test and confidence intervals resample whole clusters, so they
+reflect that correlation instead of assuming every example is independent:
+
+```json
+{
+  "id": "q5",
+  "scores": { "gpt-4": 1, "claude-3": 0 },
+  "group_id": "template-A"
+}
+```
+
+### Pairwise preference
+
+When a judge votes for a winner (A / B / tie) instead of scoring each model, use
+`preferences` (judge → winning model id, or `"tie"`) in nested JSON, or a
+`winner`/`preference` column (plus an optional `judge` column) in a record list
+or CSV. EvalTrust runs an exact sign test on the decisive votes:
+
+```json
+{
+  "id": "q6",
+  "preferences": { "gpt-judge": "gpt-4", "human": "tie" }
+}
+```
+
+```csv
+id,winner,judge
+q1,gpt-4,gpt-judge
+q1,tie,human
+```
+
 ### Record lists
 
 A flat list of rows, one per (example, model). Column names are matched flexibly
