@@ -6,24 +6,26 @@ formats.
 
 Large-file streaming
 --------------------
-JSONL and CSV are read line-by-line via generator pipelines so the raw file is
-never fully materialised as a single Python string.  The threshold is
+**JSONL and CSV** are read line-by-line via generator pipelines so the raw file
+is never fully materialised as a single Python string.  The threshold is
 ``_STREAM_THRESHOLD`` bytes (default 64 MiB); files smaller than that are fully
 materialised first (preserving the original behaviour) so the fast path stays
 fast.
 
-The win over the original ``Path.read_text()`` approach is string elimination:
-for files with large per-record fields (e.g. prompt/completion text) the raw
-byte payload is avoided entirely.  Peak memory is proportional to the row-dict
-list, not the raw file string.  Full single-pass streaming (O(1) in row count)
-requires refactoring ``detect_line_adapter`` / ``dicts_to_records`` to accept a
-one-row lookahead iterator; that is tracked in a TODO comment inside
-``_records_from_jsonl_iter``.
+The win over the original ``Path.read_text()`` approach is *string elimination*:
+the raw file bytes are never held as a single Python object.  Peak memory is
+proportional to the list of parsed row dicts, not the raw file string.
+Full single-pass O(1)-in-row-count streaming requires refactoring
+``detect_line_adapter`` / ``dicts_to_records`` to accept a one-row lookahead
+iterator; that is tracked in a TODO comment inside ``_records_from_jsonl_iter``.
 
-JSON is handled the same way for small files.  For the two common large-file
-shapes — a top-level array or ``{"examples": [...]}`` — an optional iterative
-parser is used when the ``ijson`` library is available.  When ``ijson`` is
-absent the file is loaded normally and a warning is emitted.
+**JSON** streaming is a best-effort enhancement only.  For the two common shapes
+— a top-level array or ``{"examples": [...]}`` — the optional ``ijson`` library
+is used when available, keeping peak memory proportional to the largest single
+record.  When ``ijson`` is absent the file falls back to a full ``read_text()``
+load and a warning is emitted.  The memory guarantee (peak bounded by buffer,
+not file size) therefore applies to JSONL and CSV unconditionally, and to JSON
+only when ``ijson`` is installed (``pip install 'evaltrust[streaming]'``).
 """
 
 from __future__ import annotations
