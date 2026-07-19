@@ -124,7 +124,8 @@ pip install evaltrust
 ```
 
 Requires Python 3.10 or newer. That's the whole setup - no API keys, no config,
-no account.
+no account. It runs fully offline: **no network calls, no telemetry, no data
+leaves your machine** (see the [security policy](SECURITY.md)).
 
 <details>
 <summary>Install from source (for development)</summary>
