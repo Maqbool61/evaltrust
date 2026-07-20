@@ -9,6 +9,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   differences (`score_B - score_A`, runs aligned by index) to the comparison
   layer. Additive and unused for now; it is the input for the upcoming run-aware
   estimator (#130). The default score-based path is unchanged.
+- **Governance & supply-chain artifacts.** The security policy now states
+  explicitly that EvalTrust makes no network calls and sends no telemetry, and
+  documents the (small) runtime dependency set. Added a CycloneDX SBOM: generate
+  one with `make sbom`, and a `SBOM` workflow attaches one to every published
+  release. Corrected the stale supported-versions table.
 
 ## [0.7.0] — 2026-07-17
 - **Rank stability under `--all-pairs`.** When all-pairs mode is on and a file
